@@ -29,6 +29,27 @@ function sessionKey(): string {
 type GenerateResponse = { design?: GeneratedDesign; error?: string; message?: string };
 
 /**
+ * A generation failure. `policy` is true when the prompt was rejected by content
+ * moderation (the generate-design fn returns `moderation: true`), so the UI can show
+ * a distinct "not allowed by our policy" box instead of a generic retry message.
+ */
+export class GenerationError extends Error {
+  policy: boolean;
+  constructor(message: string, policy: boolean) {
+    super(message);
+    this.name = "GenerationError";
+    this.policy = policy;
+  }
+}
+
+/** True if either the thrown error or the response body marks this as a moderation block. */
+function isPolicyBlock(error: unknown, data: unknown, message: string): boolean {
+  const flagged = (o: unknown) =>
+    !!o && typeof o === "object" && (o as Record<string, unknown>).moderation === true;
+  return flagged(error) || flagged(data) || /content policy|moderation|not allowed/i.test(message);
+}
+
+/**
  * Pull the clearest human message out of whatever the SDK hands back. On a
  * non-2xx the SDK throws an InsForgeError whose `.message` is the function's
  * `message` field and `.error` its `error` field, with extra keys (e.g.
@@ -55,10 +76,14 @@ async function invokeGenerate(body: Record<string, unknown>): Promise<GeneratedD
   const { data, error } = await insforge.functions.invoke("generate-design", {
     body: { sessionKey: sessionKey(), agentSource: "web", ...body },
   });
-  if (error) throw new Error(generationErrorMessage(error, data));
+  if (error) {
+    const msg = generationErrorMessage(error, data);
+    throw new GenerationError(msg, isPolicyBlock(error, data, msg));
+  }
   const design = (data as GenerateResponse)?.design;
   if (!design?.imageUrl) {
-    throw new Error(generationErrorMessage(null, data) || "Generation returned no design.");
+    const msg = generationErrorMessage(null, data) || "Generation returned no design.";
+    throw new GenerationError(msg, isPolicyBlock(null, data, msg));
   }
   return design;
 }

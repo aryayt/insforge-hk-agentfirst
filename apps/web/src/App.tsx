@@ -4,7 +4,7 @@ import {
   aspectRatioForProduct,
   type GeneratedDesign,
 } from "@app/shared";
-import { generateDesign, uploadDesign, generateFromBrand } from "./lib/generateImage";
+import { generateDesign, uploadDesign, generateFromBrand, GenerationError } from "./lib/generateImage";
 import { removeWhiteBackground } from "./lib/imageProcessing";
 import { fetchProduct, money, type Tee } from "./lib/catalog";
 import { buyNow } from "./lib/checkout";
@@ -61,6 +61,8 @@ export function App() {
     setPlacement(DEFAULT_PLACEMENT);
   }
   const [imgError, setImgError] = useState<string | null>(null);
+  // Set when a prompt is rejected by content moderation (shown as a distinct policy box).
+  const [policyError, setPolicyError] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [textColor, setTextColor] = useState<"#111827" | "#ffffff">("#111827");
 
@@ -106,12 +108,13 @@ export function App() {
     if (preset) setPrompt(preset);
     setLoading(true);
     setImgError(null);
+    setPolicyError(null);
     setVariations([]);
     chooseDesign(null);
     // Fire all variations at once but stream each into the UI as it lands, so the
     // first design shows after ~one model call instead of waiting for the slowest.
     let any = false;
-    let firstError: string | null = null;
+    let firstErr: unknown = null;
     const jobs = Array.from({ length: VARIATION_COUNT }, () =>
       generateDesign(q, TEE_ASPECT_RATIO)
         .then((d) => {
@@ -120,13 +123,19 @@ export function App() {
           setDesign((cur) => cur ?? d); // auto-select the first to arrive
         })
         .catch((e) => {
-          // Keep the first real reason (e.g. a content-safety block) so the user
-          // sees *why* it failed instead of a generic "try again".
-          if (!firstError) firstError = e instanceof Error ? e.message : String(e);
+          if (!firstErr) firstErr = e; // keep the first real reason
         }),
     );
     await Promise.allSettled(jobs);
-    if (!any) setImgError(firstError ?? "Couldn't generate. Try again.");
+    if (!any) {
+      // A content-moderation block gets a distinct policy box; anything else is a
+      // generic inline error.
+      if (firstErr instanceof GenerationError && firstErr.policy) {
+        setPolicyError(firstErr.message);
+      } else {
+        setImgError(firstErr instanceof Error ? firstErr.message : "Couldn't generate. Try again.");
+      }
+    }
     setLoading(false);
   }
 
@@ -435,6 +444,15 @@ export function App() {
               </label>
             </div>
             {imgError && <p className="mt-2 text-xs text-red-500">{imgError}</p>}
+            {policyError && (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3">
+                <span aria-hidden className="mt-0.5 text-amber-500">⚠️</span>
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-900">This prompt isn't allowed by our content policy</p>
+                  <p className="mt-0.5 text-amber-800">{policyError} Try describing something else.</p>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Variations */}
