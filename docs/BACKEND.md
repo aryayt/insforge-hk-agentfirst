@@ -5,9 +5,15 @@ Project **HK-agentfirst-1** · API base `https://dsc7y62h.us-east.insforge.app` 
 > Manage everything here with the `insforge` CLI (and the `insforge-cli` skill). App code uses `@insforge/sdk`.
 > Inserts take arrays: `insert([{...}])`. Reference users via `auth.users(id)`; use `auth.uid()` in RLS. Storage uploads: persist both `url` and `key`.
 
-## Status
+## Status (live)
 
-Backend is currently **empty** (no tables, buckets, or functions). This doc is the plan + the running source of truth — update it with every schema change.
+- **Schema:** applied via `migrations/20260606175802_create-commerce-schema.sql` — 7 tables (`products`, `variants`, `designs`, `carts`, `cart_items`, `orders`, `order_items`) with RLS + grants + `updated_at` triggers.
+- **Storage:** bucket `designs` created (public read) for generated/uploaded artwork.
+- **Catalog:** seeded via `scripts/seed/{products,variants}.sql` — Classic Tee (8 variants), Ceramic Mug (2), Dad Cap (2).
+- **Functions:** none deployed yet (Stripe webhook + optional design-gen pending).
+- **Payments:** not configured yet — needs a Stripe **test** secret key (`insforge payments config set test sk_test_...`).
+
+Keep this doc in sync with every schema change (same PR).
 
 ## Proposed schema (v1)
 
