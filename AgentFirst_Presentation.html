@@ -834,14 +834,21 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
 .b-sz.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
 .b-sz:hover { border-color: var(--border2); color: var(--text); }
 .s-size-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
-.s-sz-btn, .s-prod-btn {
+.s-sz-btn {
   padding: 7px; text-align: center; border-radius: 7px;
   font-size: 11px; font-weight: 700;
   background: rgba(255,255,255,0.04); border: 1px solid var(--border);
   cursor: pointer; color: var(--muted); transition: all 0.18s;
 }
-.s-prod-btn { flex: 1; }
-.s-sz-btn.active, .s-prod-btn.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
+.s-sz-btn.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
+.prod-tab {
+  padding: 9px 22px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,0.05); border: 1.5px solid var(--border2);
+  cursor: pointer; color: var(--muted); transition: all 0.18s;
+  font-family: inherit;
+}
+.prod-tab:hover { background: rgba(255,255,255,0.10); color: var(--text); }
+.prod-tab.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
 .s-action-row { display: flex; gap: 6px; }
 .s-act-btn {
   flex: 1; padding: 7px; border-radius: 7px;
@@ -886,10 +893,16 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
 <section class="slide spk2-slide" id="slide-4" style="padding-top:80px;padding-bottom:40px;">
   <div class="grid-bg"></div>
   <div class="slide-inner" style="max-width:1080px;">
-    <div style="text-align:center;margin-bottom:28px;">
+    <div style="text-align:center;margin-bottom:18px;">
       <span class="overline anim-child">05 / Virtual Try-On Studio</span>
       <h2 class="anim-child">Design it live. <span class="accent-word">See it on your merch.</span></h2>
-      <p class="lead anim-child" style="margin:0 auto;">Draw on the product below - it's fully interactive. Try the AI generator, switch colors, or flip to the back.</p>
+    </div>
+
+    <!-- PRODUCT TYPE SELECTOR -->
+    <div class="anim-child" style="display:flex;justify-content:center;gap:10px;margin-bottom:18px;position:relative;z-index:10;">
+      <button class="prod-tab active" id="tab-shirt" onclick="selectProductType(this,'shirt')" type="button">👕 Shirt</button>
+      <button class="prod-tab" id="tab-mug" onclick="selectProductType(this,'mug')" type="button">☕ Mug</button>
+      <button class="prod-tab" id="tab-cap" onclick="selectProductType(this,'cap')" type="button">🧢 Cap</button>
     </div>
 
     <div class="studio-shell anim-child">
@@ -1217,16 +1230,6 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
 
         <!-- RIGHT: Properties panel -->
         <div class="s-right">
-
-          <!-- PRODUCT SELECTOR (top so it's always visible) -->
-          <div class="s-section">
-            <div class="s-lbl">Product</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <div class="s-prod-btn active" onclick="selectProductType(this,'shirt')">👕 Shirt</div>
-              <div class="s-prod-btn" onclick="selectProductType(this,'mug')">☕ Mug</div>
-              <div class="s-prod-btn" onclick="selectProductType(this,'cap')">🧢 Cap</div>
-            </div>
-          </div>
 
           <!-- AI ENGINE STATUS -->
           <div class="s-section">
@@ -1666,7 +1669,7 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
   const CAP_CLIP   = 'path("M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z")';
 
   window.selectProductType = function(el, type) {
-    document.querySelectorAll('.s-prod-btn').forEach(e => e.classList.remove('active'));
+    document.querySelectorAll('.prod-tab').forEach(e => e.classList.remove('active'));
     el.classList.add('active');
     activeProduct = type;
 
