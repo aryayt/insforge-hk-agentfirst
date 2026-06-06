@@ -56,11 +56,11 @@ bun run typecheck      # all workspaces
 
 The MCP server reads InsForge creds from env (`INSFORGE_API_BASE_URL` + `INSFORGE_API_KEY`) and falls back to the linked `.insforge/project.json` for local dev. Run via the workspace scripts (`bun run mcp:dev`) so the cwd is `apps/mcp` — mcp-use resolves its widget toolchain from there.
 
-## Current state (2026-06-06)
+## Current state (2026-06-06, evening)
 
-- **Backend (live):** 7 tables + RLS, `designs` storage bucket, catalog seeded (tee/mug/cap). See `docs/BACKEND.md`.
-- **MCP (working):** `list_products` + `get_product` wired to InsForge; `create_design`, `add_to_cart`, `get_cart`, `create_checkout` are annotated **stubs** — these are the open feature-branch tasks.
-- **Not yet:** Stripe payments config (needs test key), the web app (`apps/web`), AI design generation, Stripe webhook function, Fly deploy.
+- **Backend (live):** 7 tables + RLS, `designs` storage bucket, catalog seeded (tee/mug/cap), Stripe **test key configured** in InsForge payments. Guest-checkout migration (`orders.user_id` nullable + anon RLS) in `migrations/` — apply with `db migrations up`.
+- **MCP (full loop, branch `mcp/core-loop`):** `list_products`, `get_product`, `create_design` (imageUrl import or OpenRouter prompt-gen → Storage), `add_to_cart`/`get_cart` (in-memory per-ChatGPT-user session), `create_checkout` (guest order + InsForge Stripe checkout session), `get_order_status`; `/checkout/success|cancel` landing pages. See `docs/RUNBOOK-demo.md` for the end-to-end demo path.
+- **Not yet:** MCP OAuth (no-auth demo posture), webhook-backed fulfillment trigger, ChatGPT widget (uiResource), the web app (`apps/web`), real fulfillment.
 
 ## Before you build (checklist)
 
