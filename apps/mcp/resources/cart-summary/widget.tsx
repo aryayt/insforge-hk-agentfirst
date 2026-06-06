@@ -128,7 +128,7 @@ export default function CartSummaryWidget() {
       </div>
 
       <p className="footer-note">
-        When this looks right, call <span className="mono">create_checkout</span> with <span className="mono">cartId: "{props.cartId ?? cart.id}"</span> to generate the Stripe test payment link.
+        When this looks right, call <span className="mono">create_checkout</span> with <span className="mono">cartId: "{props.cartId ?? cart.id}"</span> for the Stripe test flow, or <span className="mono">place_order</span> to create a real Printful order.
       </p>
     </WidgetShell>
   );

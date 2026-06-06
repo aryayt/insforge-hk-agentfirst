@@ -62,7 +62,8 @@ The MCP server reads InsForge creds from env (`INSFORGE_API_BASE_URL` + `INSFORG
 - **AI design (live):** `generate-design` edge function — moderates the prompt, generates transparent print-ready art at the product's aspect ratio (Gemini → OpenAI fallback), uploads to Storage, inserts a guest `designs` row. Model keys are InsForge secrets. Supports `source: upload` for user art too. It is the single source of truth for design creation — both surfaces call it.
 - **Web (working):** `apps/web` design studio generates via the edge function, persists the design, and carries `design_id` + the short `design_preview_url` into Stripe checkout (anon client).
 - **MCP (working):** all tools wired — `list_products`, `get_product`, `create_design` (→ edge function), `add_to_cart`/`get_cart` (per-conversation session cart), `create_checkout` (Stripe test via the anon-key client; design + agent provenance in metadata).
-- **Not yet:** Stripe webhook → order-row fulfillment (orders schema is ready; checkout metadata carries everything a webhook needs), authenticated (non-guest) flows, Fly deploy, realistic garment mockup, design variations.
+- **Live fulfillment:** Stripe test checkout creates app orders, `payments.payment_history` projects successful payments into `fulfillment_jobs`, `fulfill-order` submits them to Printful, and `printful-webhook` updates ship/failure state back onto `orders`.
+- **Still not yet:** authenticated (non-guest) flows, realistic garment mockup, design variations.
 
 ## Before you build (checklist)
 
@@ -77,4 +78,3 @@ The MCP server reads InsForge creds from env (`INSFORGE_API_BASE_URL` + `INSFORG
 - One branch per stream, one worktree per branch (`scripts/wt.sh`). Prefix by area: `mcp/`, `web/`, `backend/`, `shared/`, `docs/`.
 - Small PRs into `main`. Conventional commits (`feat(mcp): ...`, `fix(web): ...`).
 - If you change the catalog/order/design schema, update `packages/shared` first — it's the contract both surfaces depend on.
-

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const OrderStatus = z.enum(["pending", "paid", "fulfilled", "failed"]);
+export const OrderStatus = z.enum(["pending", "paid", "fulfilled", "failed", "canceled"]);
 export type OrderStatus = z.infer<typeof OrderStatus>;
 
 /** Immutable snapshot of a purchased line (variant + design + price at time of order). */
@@ -41,6 +41,9 @@ export const Order = z.object({
   agentSource: z.string().nullable().default(null),
   agentUserSubject: z.string().nullable().default(null),
   agentLocale: z.string().nullable().default(null),
+  /** Fulfillment provider bookkeeping once the order leaves our system. */
+  provider: z.string().nullable().default(null),
+  providerOrderId: z.string().nullable().default(null),
   items: z.array(OrderItem).default([]),
   createdAt: z.string().datetime().optional(),
 });

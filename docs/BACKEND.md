@@ -8,10 +8,12 @@ Project **HK-agentfirst-1** · API base `https://dsc7y62h.us-east.insforge.app` 
 ## Status (live)
 
 - **Schema:** applied via `migrations/20260606175802_create-commerce-schema.sql` — 7 tables (`products`, `variants`, `designs`, `carts`, `cart_items`, `orders`, `order_items`) with RLS + grants + `updated_at` triggers.
+- **Fulfillment schema:** live backend also has `fulfillment_jobs`, `variants.printful_variant_id`, provider columns on `orders`, and the payment projection trigger in [`migrations/20260606233000_printful-fulfillment.sql`](../migrations/20260606233000_printful-fulfillment.sql).
 - **Storage:** bucket `designs` created (public read) for generated/uploaded artwork.
 - **Catalog:** seeded via `scripts/seed/{products,variants}.sql` — Classic Tee (8 variants), Ceramic Mug (2), Dad Cap (2).
-- **Functions:** none deployed yet (Stripe webhook + optional design-gen pending).
-- **Payments:** not configured yet — needs a Stripe **test** secret key (`insforge payments config set test sk_test_...`).
+- **Functions:** deployed — `generate-design`, `create-checkout`, `cancel-order`, `fulfill-order`, `printful-catalog`, `printful-mockup`, `printful-webhook`.
+- **Payments:** Stripe **test** mode configured on the backend, with the managed webhook turned on.
+- **Schedule:** `drain-fulfillment` posts to `fulfill-order` every minute.
 
 Keep this doc in sync with every schema change (same PR).
 
@@ -37,10 +39,13 @@ RLS: users see only their own `designs`, `carts`, `cart_items`, `orders`. `produ
 
 ## Edge functions
 
-- `stripe-webhook` — verify signature, mark `orders.status`, trigger fulfillment. Stripe → InsForge-managed webhook (see `insforge payments webhooks`).
 - `generate-design` — server-side AI image generation; uploads to the `designs` bucket + inserts a row.
+- `create-checkout` — creates the trusted pending app order first, then opens a Stripe checkout session with `metadata.order_id`.
+- `cancel-order` — lets the signed-in buyer cancel an order and, if possible, deletes the matching Printful order.
+- `fulfill-order` — drains `fulfillment_jobs` and submits confirmed Printful orders (or mock fulfillment when configured).
 - `printful-mockup` — renders a design on the real product via Printful's Mockup Generator (create-task → poll). Powers the studio's photoreal preview (the `printful` MockupRenderer). Secret: `PRINTFUL_API_KEY`.
 - `printful-catalog` — live Printful product info (sizes/colors + per-variant cost) for the studio's info panel + price breakdown.
+- `printful-webhook` — receives Printful shipment/failure events and advances `orders.status` by `provider_order_id`.
 
 ## Payments (Stripe, test mode)
 
@@ -50,6 +55,8 @@ Wired via `insforge payments`:
 2. Mirror catalog: create Stripe products/prices, store `stripe_price_id` on `variants`. (`insforge payments products` / `prices` / `sync`.)
 3. `insforge payments webhooks` — register the InsForge-managed webhook; surface the signing secret into `.env.local`.
 4. `create_checkout` builds a Checkout Session from mirrored prices.
+5. `public.handle_payment_succeeded()` marks the order paid and enqueues one `fulfillment_jobs` row.
+6. `fulfill-order` drains that outbox and creates the real Printful order when `PRINTFUL_CONFIRM_ORDERS=true`.
 
 ## Conventions
 

@@ -16,6 +16,8 @@ export const Variant = z.object({
   priceDeltaCents: z.number().int().default(0),
   /** Stripe price id once mirrored via `insforge payments`. */
   stripePriceId: z.string().nullable().default(null),
+  /** Printful catalog variant id once this SKU is mapped for real fulfillment. */
+  printfulVariantId: z.number().int().nullable().default(null),
 });
 export type Variant = z.infer<typeof Variant>;
 

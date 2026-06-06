@@ -315,7 +315,7 @@ server.tool({
 server.tool({
   name: "add_to_cart",
   description:
-    "Add a product variant (optionally printed with a design) to the cart. Returns a cartId — pass it to add_to_cart again, get_cart, and create_checkout.",
+    "Add a product variant (optionally printed with a design) to the cart. Returns a cartId — pass it to add_to_cart again, get_cart, create_checkout (Stripe test), or place_order (real Printful fulfillment).",
   widget: {
     name: "cart-summary",
     invoking: "Refreshing cart...",
@@ -418,7 +418,7 @@ server.tool({
 server.tool({
   name: "create_checkout",
   description:
-    "Create a Stripe (test mode) checkout link for a cart and return the URL for the buyer to pay. The design artwork travels with the order.",
+    "Create a Stripe TEST-MODE checkout link for a cart and return the URL for the buyer to pay. Use this for the demo checkout flow. For an immediate REAL Printful order, use place_order instead.",
   inputs: [
     { name: "cartId", type: "string", description: "Cart id from add_to_cart.", required: true },
     { name: "email", type: "string", description: "Buyer email for the receipt (optional).", required: false },
@@ -488,7 +488,7 @@ server.tool({
 server.tool({
   name: "place_order",
   description:
-    "Place a REAL print-on-demand order with Printful for everything in a cart, printing each item's design, and ship it to the given address. By default this CONFIRMS the order, which CHARGES the connected Printful account immediately (real money) and starts production. Pass confirm:false to create an unconfirmed draft (priced, not charged) to preview cost first. Requires every cart item to have a design.",
+    "Place a REAL print-on-demand order with Printful for everything in a cart, printing each item's design, and ship it to the given address. This is the MCP tool to use for real fulfillment. By default it CONFIRMS the order, which CHARGES the connected Printful account immediately (real money) and starts production. Pass confirm:false to create an unconfirmed draft (priced, not charged) to preview cost first. Requires every cart item to have a design.",
   inputs: [
     { name: "cartId", type: "string", description: "Cart id from add_to_cart.", required: true },
     { name: "name", type: "string", description: "Recipient full name.", required: true },
