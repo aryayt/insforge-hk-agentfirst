@@ -18,10 +18,16 @@ COPY apps/mcp apps/mcp
 # mcp-use resolves its toolchain from cwd — run from apps/mcp like `bun run mcp:dev`.
 WORKDIR /app/apps/mcp
 
+# Build the ChatGPT widget into dist/ so production serves the real bundled widget.
+# mountWidgetsProduction reads ./dist ONLY when NODE_ENV=production (set below, after
+# the build so devDeps like vite are still installed at build time).
+RUN bun run build
+
 # mcp-use defaults to binding localhost; Fly/compute routes to the container's
 # private IP, so bind all interfaces or the service is unreachable (HTTP 000).
 ENV HOST=0.0.0.0
 ENV MCP_PORT=8788
+ENV NODE_ENV=production
 EXPOSE 8788
 
 # INSFORGE_API_BASE_URL, INSFORGE_API_KEY, MCP_PUBLIC_URL (+ optional OPENROUTER_*)

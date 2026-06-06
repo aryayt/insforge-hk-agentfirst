@@ -13,6 +13,9 @@ const server = createMCPServer("agent-shop", {
   version: "0.1.0",
   description:
     "Shop for and design custom t-shirts, mugs, and caps, then check out with Stripe without leaving the chat.",
+  // Public origin for widget resource URLs in production (Fly/compute). Without it,
+  // mcp-use generates localhost:// widget URIs that ChatGPT's iframe cannot load.
+  baseUrl: process.env.MCP_PUBLIC_URL ?? process.env.MCP_BASE_URL,
 });
 
 const money = (cents: number): string => `$${(cents / 100).toFixed(2)}`;

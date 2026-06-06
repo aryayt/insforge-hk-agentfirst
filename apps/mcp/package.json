@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "bun --watch src/server.ts",
     "start": "bun src/server.ts",
+    "build": "mcp-use build",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
