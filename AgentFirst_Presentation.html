@@ -1664,9 +1664,6 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
   };
 
   const PRODUCT_LABELS = { shirt: 'FRONT VIEW', mug: 'MUG VIEW', cap: 'CAP VIEW' };
-  const SHIRT_CLIP = 'path("M 100,34 C 109,48 121,55 130,55 C 139,55 151,48 160,34 C 176,30 194,37 206,49 L 241,67 C 253,76 255,91 247,101 L 226,109 C 215,114 207,108 206,97 L 206,281 L 54,281 L 54,97 C 53,108 45,114 34,109 L 13,101 C 5,91 7,76 19,67 L 54,49 C 66,37 84,30 100,34 Z")';
-  const MUG_CLIP   = 'path("M 65,66 Q 130,53 195,66 L 189,251 Q 130,265 71,251 Z")';
-  const CAP_CLIP   = 'path("M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z")';
 
   window.selectProductType = function(el, type) {
     document.querySelectorAll('.prod-tab').forEach(e => e.classList.remove('active'));
@@ -1756,8 +1753,10 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
   // ── AI GENERATE - CSS overlay (bypasses canvas CORS entirely) ──
   const DARK_SHIRTS = new Set(['gradient','#1e3a5f','#3d1515','#142814','#2a1a3a']);
 
-  // Shirt clip-path string (matches .shirt-canvas-layer, 260×300 space)
+  // Clip-path strings per product (260×300 canvas space)
   const SHIRT_CLIP = 'path("M 100,34 C 109,48 121,55 130,55 C 139,55 151,48 160,34 C 176,30 194,37 206,49 L 241,67 C 253,76 255,91 247,101 L 226,109 C 215,114 207,108 206,97 L 206,281 L 54,281 L 54,97 C 53,108 45,114 34,109 L 13,101 C 5,91 7,76 19,67 L 54,49 C 66,37 84,30 100,34 Z")';
+  const MUG_CLIP   = 'path("M 65,66 Q 130,53 195,66 L 189,251 Q 130,265 71,251 Z")';
+  const CAP_CLIP   = 'path("M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z")';
 
   function getOrCreateOverlay(face) {
     const id = 'aiOverlay_' + face;
