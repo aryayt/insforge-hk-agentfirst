@@ -31,17 +31,26 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-/** Resolve the signed-in user from the forwarded bearer token (guests/anon → null). */
-async function resolveUserId(req: Request): Promise<string | null> {
+/**
+ * Build a USER-scoped client + id from the forwarded JWT (guests/anon → null).
+ * Uses `edgeFunctionToken` (the documented edge pattern) so getCurrentUser AND the
+ * payments call run as the user — InsForge payments rejects the admin/service key
+ * ("Checkout session creation requires a user token").
+ */
+async function userContext(
+  req: Request,
+): Promise<{ userId: string; client: ReturnType<typeof createClient> } | null> {
   const authz = req.headers.get("Authorization") ?? req.headers.get("authorization");
   const token = authz?.replace(/^Bearer\s+/i, "").trim();
   if (!token || token === Deno.env.get("ANON_KEY") || token === Deno.env.get("API_KEY")) return null;
   try {
-    const user = createClient({ baseUrl: Deno.env.get("INSFORGE_BASE_URL"), anonKey: Deno.env.get("ANON_KEY") });
-    user.setAccessToken(token);
-    const { data, error } = await user.auth.getCurrentUser();
-    if (error) return null;
-    return data?.user?.id ?? null;
+    const client = createClient({
+      baseUrl: Deno.env.get("INSFORGE_BASE_URL"),
+      edgeFunctionToken: token,
+    });
+    const { data, error } = await client.auth.getCurrentUser();
+    if (error || !data?.user?.id) return null;
+    return { userId: data.user.id, client };
   } catch {
     return null;
   }
@@ -76,8 +85,9 @@ export default async function (req: Request): Promise<Response> {
     return json(400, { error: "JSON body required" });
   }
 
-  const userId = await resolveUserId(req);
-  if (!userId) return json(401, { error: "Sign in to check out." });
+  const ctx = await userContext(req);
+  if (!ctx) return json(401, { error: "Sign in to check out." });
+  const userId = ctx.userId;
 
   const sku = body.sku?.trim();
   if (!sku) return json(400, { error: "sku required" });
@@ -168,19 +178,24 @@ export default async function (req: Request): Promise<Response> {
   // Flip to live by setting the STRIPE_ENV secret to "live" (after a live key + live
   // prices are configured). Defaults to test so nothing charges real money by accident.
   const stripeEnv = (Deno.env.get("STRIPE_ENV") ?? "test") as "test" | "live";
-  const { data, error } = await admin.payments.createCheckoutSession(stripeEnv, {
+  // Created with the USER client (payments requires a user token). No `subject` — this is
+  // a one-time guest-style payment; the order is linked via metadata.order_id.
+  const { data, error } = await ctx.client.payments.createCheckoutSession(stripeEnv, {
     mode: "payment",
     lineItems: [{ stripePriceId: variant.stripe_price_id, quantity: qty }],
     successUrl,
     cancelUrl: body.cancelUrl ?? `${origin}/?checkout=canceled`,
     customerEmail: body.email ?? null,
-    subject: { type: "user", id: userId },
     metadata: { order_id: orderId },
     idempotencyKey: `order:${orderId}`,
   });
   if (error) {
     console.error("createCheckoutSession", error);
-    return json(502, { error: "Could not start checkout. Is Stripe configured?" });
+    const detail =
+      (error as { message?: string; error?: string })?.message ??
+      (error as { error?: string })?.error ??
+      JSON.stringify(error);
+    return json(502, { error: `Checkout failed: ${detail}` });
   }
   const session = (data as { checkoutSession?: { url?: string; id?: string } } | null)?.checkoutSession;
   if (!session?.url) return json(502, { error: "Checkout session returned no URL" });
