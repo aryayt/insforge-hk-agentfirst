@@ -45,6 +45,33 @@ export function generateDesign(prompt: string, aspectRatio: string): Promise<Gen
   return invokeGenerate({ prompt, aspectRatio, transparent: true });
 }
 
+/**
+ * Generate `n` independent variations of a prompt in parallel — the studio shows
+ * them as a strip to choose from. Settles individually so one slow/failed call
+ * doesn't sink the rest; throws only if every variation fails.
+ */
+export async function generateVariations(
+  prompt: string,
+  aspectRatio: string,
+  n = 3,
+): Promise<GeneratedDesign[]> {
+  const results = await Promise.allSettled(
+    Array.from({ length: n }, () => generateDesign(prompt, aspectRatio)),
+  );
+  const designs = results
+    .filter((r): r is PromiseFulfilledResult<GeneratedDesign> => r.status === "fulfilled")
+    .map((r) => r.value);
+  if (!designs.length) {
+    const firstReject = results.find((r) => r.status === "rejected") as
+      | PromiseRejectedResult
+      | undefined;
+    throw firstReject?.reason instanceof Error
+      ? firstReject.reason
+      : new Error("Generation failed. Try again.");
+  }
+  return designs;
+}
+
 /** Persist user-uploaded art as a design (so it travels to checkout like AI art). */
 export async function uploadDesign(file: File, label?: string): Promise<GeneratedDesign> {
   const imageBase64 = await fileToDataUrl(file);
