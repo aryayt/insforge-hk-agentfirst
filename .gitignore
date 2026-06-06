@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+# bun.lock is committed (reproducible workspace installs)
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.local
+.insforge/credentials*
+.dev.vars
+
+# Build output
+dist/
+build/
+.next/
+out/
+.vercel/
+.output/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Tunnels
+.ngrok*
+cloudflared.log
+
+# Worktrees live outside the repo dir; ignore any accidental in-tree trees
+/worktrees/
+
+# Agent / tooling local state
+.omc/
+
+# InsForge & AI agent skills
+.insforge
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf
