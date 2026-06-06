@@ -18,6 +18,9 @@ COPY apps/mcp apps/mcp
 # mcp-use resolves its toolchain from cwd — run from apps/mcp like `bun run mcp:dev`.
 WORKDIR /app/apps/mcp
 
+# mcp-use defaults to binding localhost; Fly/compute routes to the container's
+# private IP, so bind all interfaces or the service is unreachable (HTTP 000).
+ENV HOST=0.0.0.0
 ENV MCP_PORT=8788
 EXPOSE 8788
 

@@ -7,7 +7,9 @@
  *   cd apps/mcp && set -a; source ../../.env.local; set +a; bun verify-mcp.ts
  */
 const PORT = process.env.MCP_PORT ?? "8788";
-const URL = `http://localhost:${PORT}/mcp`;
+// MCP_URL lets this run against a deployed endpoint, e.g.
+//   MCP_URL=https://<endpoint>/mcp bun verify-mcp.ts
+const URL = process.env.MCP_URL ?? `http://localhost:${PORT}/mcp`;
 
 let sessionId: string | null = null;
 let nextId = 1;
