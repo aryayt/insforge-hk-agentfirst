@@ -35,8 +35,8 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   /** True if signed in; otherwise opens the auth dialog and returns false. */
-  requireAuth: () => boolean;
-  openAuth: () => void;
+  requireAuth: (notice?: string) => boolean;
+  openAuth: (notice?: string) => void;
   closeAuth: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
@@ -71,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
 
   // Rehydrate the session on load. In a SPA the access token lives in memory, so
   // getCurrentUser() refreshes it from the httpOnly refresh cookie when present.
@@ -91,13 +92,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     user,
     loading,
-    requireAuth() {
+    requireAuth(notice) {
       if (user) return true;
+      setAuthNotice(notice ?? null);
       setAuthOpen(true);
       return false;
     },
-    openAuth: () => setAuthOpen(true),
-    closeAuth: () => setAuthOpen(false),
+    openAuth(notice) {
+      setAuthNotice(notice ?? null);
+      setAuthOpen(true);
+    },
+    closeAuth() {
+      setAuthOpen(false);
+      setAuthNotice(null);
+    },
     async signIn(email, password) {
       const { data, error } = await insforge.auth.signInWithPassword({ email, password });
       if (error) rethrow(error);
@@ -137,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {authOpen && <AuthDialog />}
+      {authOpen && <AuthDialog initialNotice={authNotice} />}
     </AuthContext.Provider>
   );
 }
@@ -151,7 +159,7 @@ export function useAuth(): AuthContextValue {
 type Mode = "signin" | "signup" | "verify";
 
 /** Sign in / sign up / verify-code modal, opened via `openAuth()`/`requireAuth()`. */
-function AuthDialog() {
+function AuthDialog({ initialNotice }: { initialNotice?: string | null }) {
   const { signIn, signUp, verifyEmail, resendVerification, signInWithOAuth, closeAuth } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -160,7 +168,11 @@ function AuthDialog() {
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(initialNotice ?? null);
+
+  useEffect(() => {
+    setNotice(initialNotice ?? null);
+  }, [initialNotice]);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);

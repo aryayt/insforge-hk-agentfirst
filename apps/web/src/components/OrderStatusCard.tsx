@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { cancelOrder, fetchOrder, type OrderStatus } from "../lib/orders";
 import { money } from "../lib/catalog";
+import { isAuthError } from "../lib/errors";
+import { useAuth } from "../lib/auth";
 
 const LABEL: Record<OrderStatus, string> = {
   pending: "Payment processing…",
@@ -23,6 +25,7 @@ const TONE: Record<OrderStatus, string> = {
  * Printful sends it to production).
  */
 export function OrderStatusCard({ orderId }: { orderId: string }) {
+  const { openAuth } = useAuth();
   const [status, setStatus] = useState<OrderStatus | null>(null);
   const [amountCents, setAmountCents] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,7 +69,13 @@ export function OrderStatusCard({ orderId }: { orderId: string }) {
     try {
       setStatus(await cancelOrder(orderId));
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't cancel this order.");
+      if (isAuthError(e)) {
+        const msg = "Your session expired. Please sign in again.";
+        setErr(msg);
+        openAuth(msg);
+      } else {
+        setErr(e instanceof Error ? e.message : "Couldn't cancel this order.");
+      }
     } finally {
       setBusy(false);
     }

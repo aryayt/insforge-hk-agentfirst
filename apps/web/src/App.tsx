@@ -19,6 +19,7 @@ import { PrintfulMockupCard } from "./components/MockupCompare";
 import { ProductInfoPanel } from "./components/ProductInfoPanel";
 import { OrderStatusCard } from "./components/OrderStatusCard";
 import { PRINTFUL_PRODUCT_BY_SLUG } from "./lib/mockup";
+import { isAuthError } from "./lib/errors";
 import { AccountControl } from "./components/AccountControl";
 import { useAuth } from "./lib/auth";
 
@@ -42,7 +43,7 @@ const checkoutParam = new URLSearchParams(window.location.search).get("checkout"
 const orderParam = new URLSearchParams(window.location.search).get("order");
 
 export function App() {
-  const { user, requireAuth } = useAuth();
+  const { user, loading: authLoading, requireAuth, openAuth } = useAuth();
 
   // design
   const [mode, setMode] = useState<"describe" | "url">("describe");
@@ -202,11 +203,11 @@ export function App() {
   const totalCents = unitPriceCents != null ? unitPriceCents * qty : null;
 
   const hasDesign = !!design || !!text.trim();
-  const canBuy = hasDesign && !!variant?.sku && shippingValid && !buying;
+  const canBuy = hasDesign && !!variant?.sku && shippingValid && !buying && !authLoading;
 
   async function handleBuy() {
     if (!variant?.sku || !shippingValid) return;
-    if (!requireAuth()) return; // must be signed in to buy
+    if (!requireAuth("Please sign in to continue to checkout.")) return; // must be signed in to buy
     setBuying(true);
     setBuyError(null);
     try {
@@ -226,7 +227,13 @@ export function App() {
         },
       });
     } catch (e) {
-      setBuyError(e instanceof Error ? e.message : "Checkout failed. Please try again.");
+      if (isAuthError(e)) {
+        const msg = "Your session expired. Please sign in again.";
+        setBuyError(msg);
+        openAuth(msg);
+      } else {
+        setBuyError(e instanceof Error ? e.message : "Checkout failed. Please try again.");
+      }
       setBuying(false);
     }
   }
