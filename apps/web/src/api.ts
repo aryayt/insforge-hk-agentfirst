@@ -1,4 +1,4 @@
-/** All backend access for the storefront — InsForge SDK (anon client). */
+/** All backend access for the storefront: InsForge SDK (anon client). */
 import type { Product, Variant } from "@app/shared";
 import { insforge } from "./insforge";
 import type { CartItem } from "./cart";
@@ -101,20 +101,18 @@ async function createGuestOrder(
   const token = guestToken();
   const orderId = crypto.randomUUID();
   const amount = items.reduce((s, i) => s + i.unitPriceCents * i.qty, 0);
-  // Only persist remote (http) preview URLs — never multi-MB data URLs in Postgres.
+  // Only persist remote (http) preview URLs; never multi-MB data URLs in Postgres.
   const preview =
     items.find((i) => i.design?.artUrl && /^https?:/.test(i.design.artUrl))?.design?.artUrl ?? null;
 
   const { error: oErr } = await insforge.database.from("orders").insert([
-    {
-      id: orderId,
-      user_id: null,
-      status: "pending",
-      amount_cents: amount,
-      guest_token: token,
+    buildGuestOrderInsert({
+      orderId,
+      token,
+      amountCents: amount,
       email,
-      design_preview_url: preview,
-    },
+      previewUrl: preview,
+    }),
   ]);
   if (oErr) throw oErr;
 
@@ -125,7 +123,7 @@ async function createGuestOrder(
     variant_id: i.variantId,
     qty: i.qty,
     unit_price_cents: i.unitPriceCents,
-    product_label: `${i.productName} — ${i.color}${i.size ? ` / ${i.size}` : ""}`,
+    product_label: `${i.productName} - ${i.color}${i.size ? ` / ${i.size}` : ""}`,
     design_label:
       i.design?.artLabel ?? (i.design?.text ? `text: "${i.design.text}"` : null),
   }));
@@ -133,6 +131,27 @@ async function createGuestOrder(
   if (iErr) throw iErr;
 
   return { orderId, token };
+}
+
+type GuestOrderInsertInput = {
+  orderId: string;
+  token: string;
+  amountCents: number;
+  email: string | null;
+  previewUrl: string | null;
+};
+
+export function buildGuestOrderInsert(input: GuestOrderInsertInput) {
+  return {
+    id: input.orderId,
+    user_id: null,
+    status: "pending",
+    amount_cents: input.amountCents,
+    guest_token: input.token,
+    email: input.email,
+    design_preview_url: input.previewUrl,
+    agent_source: "web",
+  };
 }
 
 /** Create the pending order, then redirect to Stripe Checkout (test mode). */
@@ -219,7 +238,7 @@ export async function listMyOrders(): Promise<Array<OrderRow & { items: OrderIte
   return orders.map((o) => ({ ...o, items: items.filter((it) => it.order_id === o.id) }));
 }
 
-/** For the in-app "Data" view — recent guest orders straight from the DB. */
+/** For the in-app "Data" view: recent guest orders straight from the DB. */
 export async function listRecentOrders(limit = 20): Promise<OrderRow[]> {
   const { data, error } = await insforge.database
     .from("orders")

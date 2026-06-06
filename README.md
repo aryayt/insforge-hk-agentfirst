@@ -12,8 +12,8 @@
 
 | Surface | Flow | Status |
 |---|---|---|
-| MCP (ChatGPT) | `list_products` → `get_product` → `create_design` (image import or AI prompt) → `add_to_cart` → `get_cart` → `create_checkout` (Stripe test) → `get_order_status` | ✅ full loop |
-| Web | browse → design studio (text/preset/upload/**AI ✨**) → cart → anonymous Stripe checkout → orders + `/data` live DB view | ✅ full loop |
+| MCP (ChatGPT) | `list_products` widget -> `get_product` -> `create_design` (image import or AI prompt) -> `add_to_cart` -> `get_cart` widget -> `remove_from_cart` if needed -> `create_checkout` (Stripe test) -> `get_order_status` | ✅ full loop + widget |
+| Web | browse -> design studio (text/preset/upload/AI art) -> cart -> anonymous Stripe checkout -> orders + `/data` live DB view | ✅ full loop |
 | Backend | catalog + guest orders + persisted designs + Stripe test prices + agent attribution + AI `generate-design` function | ✅ after migrations |
 
 > **Demo pricing:** the Classic Tee is set to a flat **$2.00** (all variants) so live test payments feel real without feeling expensive — see `scripts/seed/demo-pricing.ts`. (InsForge's checkout schema has no promo-code field, so the discount is baked into the Stripe price rather than applied via a coupon.)
@@ -87,7 +87,7 @@ packages/shared/ Shared zod schemas + TS types
 migrations/      SQL migrations (apply: bunx @insforge/cli db migrations up --all)
 scripts/seed/    Catalog + Stripe price seeds
 docs/            PRODUCT, ARCHITECTURE, BACKEND, RUNBOOK-demo, BRANCHING, DECISIONS/
-skills/          Vendored InsForge agent skills (insforge, insforge-cli, -debug, -integrations)
+skills/          Vendored agent skills (InsForge, mcp-use app builders, Impeccable)
 ```
 
 ## Docs
@@ -99,12 +99,13 @@ skills/          Vendored InsForge agent skills (insforge, insforge-cli, -debug,
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | System design + data flow |
 | [`docs/BACKEND.md`](./docs/BACKEND.md) | InsForge schema, buckets, payments, demo posture |
 | [`docs/RUNBOOK-demo.md`](./docs/RUNBOOK-demo.md) | End-to-end demo path (local → deploy → ChatGPT) |
+| [`docs/DESIGN-AUDIT.md`](./docs/DESIGN-AUDIT.md) | Impeccable audit notes and follow-up design backlog |
 | [`docs/BRANCHING.md`](./docs/BRANCHING.md) | Branch + worktree workflow for the team |
 | [`docs/DECISIONS/`](./docs/DECISIONS/) | Architecture Decision Records |
 
 ## Roadmap (GitHub issues)
 
-#1 MCP Apps-SDK widgets (in-chat product/design UI) · ~~#2 AI design edge function~~ ✅ done · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment (replace success-redirect paid-marking) · #5 production deploy.
+#1 MCP Apps-SDK widgets: catalog/cart done, design widget still open · ~~#2 AI design edge function~~ ✅ done · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment (replace success-redirect paid-marking) · #5 production deploy.
 
 Next UX work queued behind those: show the print placement zone on the product preview, real image upload to Storage from the web studio, lightweight background-removal for uploaded art.
 

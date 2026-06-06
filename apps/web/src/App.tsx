@@ -8,17 +8,20 @@ import { Catalog, CartPage, DataPage, OrdersPage, SuccessPage } from "./pages";
 
 function Nav() {
   const cart = useCart();
-  const link = "rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900";
+  const link = "rounded-md px-3 py-1.5 text-sm font-semibold text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink)] focus-visible:bg-[var(--surface-muted)]";
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--surface)_88%,transparent)] backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <Link to="/" className="text-lg font-extrabold tracking-tight">🧵 Agent Shop</Link>
+        <Link to="/" className="flex items-center gap-2 text-lg font-extrabold">
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-[var(--accent)] text-sm text-white">AS</span>
+          Agent Shop
+        </Link>
         <nav className="flex items-center gap-1">
           <Link to="/" className={link}>Shop</Link>
           <Link to="/data" className={link}>Data</Link>
           <Link to="/orders" className={link}>Orders</Link>
-          <Link to="/cart" className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white">
-            Cart{cart.count ? ` · ${cart.count}` : ""}
+          <Link to="/cart" className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[var(--accent-hover)]">
+            Cart{cart.count ? ` (${cart.count})` : ""}
           </Link>
         </nav>
       </div>
@@ -29,8 +32,8 @@ function Nav() {
 function StudioRoute({ products }: { products: Product[] }) {
   const { slug } = useParams();
   const product = products.find((p) => p.slug === slug);
-  if (products.length === 0) return <p>Loading…</p>;
-  if (!product) return <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-200">Product not found. <Link to="/" className="underline">Back to shop</Link></div>;
+  if (products.length === 0) return <p>Loading...</p>;
+  if (!product) return <div className="rounded-lg bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]">Product not found. <Link to="/" className="underline">Back to shop</Link></div>;
   return <Studio product={product} />;
 }
 
@@ -49,7 +52,7 @@ export default function App() {
       <Nav />
       <main className="mx-auto max-w-5xl px-4 py-8">
         {error && (
-          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700 ring-1 ring-red-100">
             Couldn't reach the backend: {error}
           </div>
         )}

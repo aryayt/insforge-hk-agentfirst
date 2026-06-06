@@ -1,4 +1,4 @@
-import { createMCPServer } from "mcp-use/server";
+import { createMCPServer, text, widget } from "mcp-use/server";
 import { getProduct, listProducts } from "./catalog";
 import { generateDesign, importArtwork, persistDesign } from "./designs";
 import {
@@ -7,12 +7,12 @@ import {
   getOrder,
   markPaidFromSuccessRedirect,
 } from "./orders";
-import { callerInfo, cartTotalCents, getSession, sessionKey } from "./session";
+import { callerInfo, cartTotalCents, getSession, removeCartLine, sessionKey } from "./session";
 
 const server = createMCPServer("agent-shop", {
   version: "0.1.0",
   description:
-    "Shop for and design custom t-shirts, mugs, and caps — and check out with Stripe — without leaving the chat.",
+    "Shop for and design custom t-shirts, mugs, and caps, then check out with Stripe without leaving the chat.",
 });
 
 const money = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
@@ -23,24 +23,22 @@ server.tool({
   description:
     "List products available to buy and customize (t-shirts, mugs, caps), with base prices and variant counts.",
   inputs: [],
+  widget: {
+    name: "agent-shop",
+    invoking: "Loading catalog...",
+    invoked: "Catalog ready",
+  },
   annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   cb: async () => {
     const products = await listProducts();
     const lines = products.map(
       (p) =>
-        `• ${p.name} (${p.slug}) — from ${money(p.basePriceCents)} · ${p.variants.length} variants`,
+        `• ${p.name} (${p.slug}): from ${money(p.basePriceCents)}, ${p.variants.length} variants`,
     );
-    return {
-      content: [
-        {
-          type: "text",
-          text: products.length
-            ? `Available products:\n${lines.join("\n")}`
-            : "No products available.",
-        },
-      ],
-      structuredContent: { products },
-    };
+    return widget({
+      props: { mode: "catalog", products },
+      output: text(products.length ? `Available products:\n${lines.join("\n")}` : "No products available."),
+    });
   },
 });
 
@@ -73,7 +71,7 @@ server.tool({
       content: [
         {
           type: "text",
-          text: `${product.name} — ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
+          text: `${product.name}: ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
         },
       ],
       structuredContent: { product },
@@ -91,7 +89,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 server.tool({
   name: "create_design",
   description:
-    "Create print artwork for a product. Pass an imageUrl (e.g. an image the user already generated in this chat) OR a text prompt to generate artwork server-side. Stores the artwork durably and returns a design id + preview URL. Keep designs original — no brand logos or copyrighted characters.",
+    "Create print artwork for a product. Pass an imageUrl (e.g. an image the user already generated in this chat) OR a text prompt to generate artwork server-side. Stores the artwork durably and returns a design id + preview URL. Keep designs original: no brand logos or copyrighted characters.",
   inputs: [
     {
       name: "prompt",
@@ -199,7 +197,7 @@ server.tool({
         content: [
           {
             type: "text" as const,
-            text: `Added ${quantity}× ${variant.productLabel}${design ? ` with design "${design.label}"` : ""} — ${money(variant.unitPriceCents)} each.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}). Use create_checkout when ready.`,
+            text: `Added ${quantity}x ${variant.productLabel}${design ? ` with design "${design.label}"` : ""}: ${money(variant.unitPriceCents)} each.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}). Use create_checkout when ready.`,
           },
         ],
         structuredContent: { cart: session.cart, totalCents: total },
@@ -214,22 +212,58 @@ server.tool({
   name: "get_cart",
   description: "Show the current cart contents and total.",
   inputs: [],
+  widget: {
+    name: "agent-shop",
+    invoking: "Loading cart...",
+    invoked: "Cart ready",
+  },
   annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   cb: async (_args: Record<string, never>, ctx: unknown) => {
     const session = getSession(sessionKey(ctx));
     if (session.cart.length === 0) {
-      return { content: [{ type: "text" as const, text: "Cart is empty. Use list_products to browse." }] };
+      return widget({
+        props: { mode: "cart", cart: [], totalCents: 0 },
+        output: text("Cart is empty. Use list_products to browse."),
+      });
     }
     const lines = session.cart.map(
       (i, n) =>
-        `${n + 1}. ${i.qty}× ${i.productLabel}${i.designLabel ? ` · design "${i.designLabel}"` : ""} — ${money(i.unitPriceCents * i.qty)}`,
+        `${n + 1}. ${i.qty}x ${i.productLabel}${i.designLabel ? `, design "${i.designLabel}"` : ""}: ${money(i.unitPriceCents * i.qty)}`,
     );
+    const total = cartTotalCents(session.cart);
+    return widget({
+      props: { mode: "cart", cart: session.cart, totalCents: total },
+      output: text(`Cart:\n${lines.join("\n")}\nTotal: ${money(total)}`),
+    });
+  },
+});
+
+server.tool({
+  name: "remove_from_cart",
+  description:
+    "Remove a line from the current cart by its 1-based line number from get_cart. Use this when the user changes their mind or asks to fix the cart.",
+  inputs: [
+    {
+      name: "lineNumber",
+      type: "number",
+      description: "1-based cart line number shown by get_cart.",
+      required: true,
+    },
+  ],
+  annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: true },
+  cb: async ({ lineNumber }: { lineNumber: number }, ctx: unknown) => {
+    const session = getSession(sessionKey(ctx));
+    const removed = removeCartLine(session.cart, lineNumber);
+    if (!removed) return fail(`No cart line ${lineNumber}. Run get_cart to see current line numbers.`);
     const total = cartTotalCents(session.cart);
     return {
       content: [
-        { type: "text" as const, text: `Cart:\n${lines.join("\n")}\nTotal: ${money(total)}` },
+        {
+          type: "text" as const,
+          text: `Removed ${removed.qty}x ${removed.productLabel}${removed.designLabel ? ` with design "${removed.designLabel}"` : ""}.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}).`,
+        },
       ],
-      structuredContent: { cart: session.cart, totalCents: total },
+      structuredContent: { removed, cart: session.cart, totalCents: total },
     };
   },
 });
@@ -270,7 +304,7 @@ server.tool({
         content: [
           {
             type: "text" as const,
-            text: `Checkout ready — total ${money(result.amountCents)} (Stripe TEST mode; card 4242 4242 4242 4242, any future expiry/CVC).\nPay here: ${result.checkoutUrl}\nOrder id: ${result.orderId} — check progress with get_order_status.`,
+            text: `Checkout ready: total ${money(result.amountCents)} (Stripe TEST mode; card 4242 4242 4242 4242, any future expiry/CVC).\nPay here: ${result.checkoutUrl}\nOrder id: ${result.orderId}. Check progress with get_order_status.`,
           },
         ],
         structuredContent: { orderId: result.orderId, checkoutUrl: result.checkoutUrl, amountCents: result.amountCents },
@@ -284,7 +318,7 @@ server.tool({
 server.tool({
   name: "get_order_status",
   description:
-    "Check an order's status (pending → paid → fulfilled). Defaults to this session's most recent order if no orderId given.",
+    "Check an order's status (pending -> paid -> fulfilled). Defaults to this session's most recent order if no orderId given.",
   inputs: [
     { name: "orderId", type: "string", description: "Order id from create_checkout.", required: false },
   ],
@@ -297,13 +331,13 @@ server.tool({
       const order = await getOrder(id);
       if (!order) return fail(`No order "${id}".`);
       const lines = order.items.map(
-        (i) => `- ${i.qty}× ${i.productLabel ?? "item"}${i.designLabel ? ` · "${i.designLabel}"` : ""}`,
+        (i) => `- ${i.qty}x ${i.productLabel ?? "item"}${i.designLabel ? `, "${i.designLabel}"` : ""}`,
       );
       return {
         content: [
           {
             type: "text" as const,
-            text: `Order ${order.id}\nStatus: ${order.status.toUpperCase()} — ${money(order.amountCents)}\n${lines.join("\n")}`,
+            text: `Order ${order.id}\nStatus: ${order.status.toUpperCase()}, ${money(order.amountCents)}\n${lines.join("\n")}`,
           },
         ],
         structuredContent: { order },
@@ -344,7 +378,7 @@ server.get("/checkout/success", async (c) => {
 });
 
 server.get("/checkout/cancel", (c) =>
-  c.html(page("Checkout cancelled", "<p>No charge was made. Your cart was already submitted as a pending order — ask your agent to create a new checkout if you change your mind.</p>")),
+  c.html(page("Checkout cancelled", "<p>No charge was made. Your cart was already submitted as a pending order. Ask your agent to create a new checkout if you change your mind.</p>")),
 );
 
 const PORT = Number(process.env.MCP_PORT ?? 8788);

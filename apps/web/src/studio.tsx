@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ButtonHTMLAttributes } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Product, Variant } from "@app/shared";
 import { insforge } from "./insforge";
@@ -19,7 +19,7 @@ const PRESETS: Array<{ label: string; url: string }> = [
 type Tab = "text" | "art" | "upload" | "ai";
 
 async function generateAiArt(prompt: string): Promise<string> {
-  // Calls the deployed `generate-design` edge function (Gemini → OpenAI fallback,
+  // Calls the deployed `generate-design` edge function (Gemini to OpenAI fallback,
   // keys live as InsForge secrets). Response shape: { design: { imageUrl, ... } }.
   const { data, error } = await insforge.functions.invoke("generate-design", {
     body: { prompt, agentSource: "web" },
@@ -86,7 +86,7 @@ export function Studio({ product }: { product: Product }) {
       setArtUrl(url);
       setArtLabel(`AI: ${aiPrompt.trim()}`);
     } catch {
-      setAiError("AI generation isn't wired up yet — use a preset or upload for now.");
+      setAiError("AI generation is not wired up yet. Use a preset or upload for now.");
     } finally {
       setAiBusy(false);
     }
@@ -113,11 +113,11 @@ export function Studio({ product }: { product: Product }) {
     navigate("/cart");
   };
 
-  const Btn = ({ active, ...p }: { active: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  const Btn = ({ active, ...p }: { active: boolean } & ButtonHTMLAttributes<HTMLButtonElement>) => (
     <button
       {...p}
-      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-        active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white hover:border-slate-400"
+      className={`rounded-md border px-3 py-1.5 text-sm font-semibold transition ${
+        active ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)]"
       }`}
     />
   );
@@ -125,21 +125,21 @@ export function Studio({ product }: { product: Product }) {
   return (
     <div className="grid gap-8 md:grid-cols-2">
       {/* Preview */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <div className="rounded-lg bg-[var(--surface)] p-6 ring-1 ring-[var(--line)]">
         <ProductMockup type={product.type} color={color} artUrl={artUrl} text={text} textColor={textColor} />
-        <p className="mt-3 text-center text-sm text-slate-500">Live preview · {color}{size ? ` / ${size}` : ""}</p>
+        <p className="mt-3 text-center text-sm text-[var(--muted)]">Live preview, {color}{size ? ` / ${size}` : ""}</p>
       </div>
 
       {/* Controls */}
       <div className="flex flex-col gap-5">
         <div>
           <h1 className="text-2xl font-bold">{product.name}</h1>
-          <p className="text-slate-600">{product.description}</p>
+          <p className="text-[var(--muted)]">{product.description}</p>
           <p className="mt-1 text-3xl font-extrabold">{money(price)}</p>
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-semibold text-slate-700">Color</p>
+          <p className="mb-2 text-sm font-semibold text-[var(--muted)]">Color</p>
           <div className="flex gap-2">
             {colors.map((c) => (
               <button
@@ -147,9 +147,9 @@ export function Studio({ product }: { product: Product }) {
                 onClick={() => onColor(c)}
                 title={c}
                 className={`h-9 w-9 rounded-full ring-2 ring-offset-2 transition ${
-                  color === c ? "ring-slate-900" : "ring-transparent hover:ring-slate-300"
+                  color === c ? "ring-[var(--accent)]" : "ring-transparent hover:ring-[var(--line)]"
                 }`}
-                style={{ backgroundColor: colorHex(c), border: "1px solid #cbd5e1" }}
+                style={{ backgroundColor: colorHex(c), border: "1px solid var(--line)" }}
               />
             ))}
           </div>
@@ -157,7 +157,7 @@ export function Studio({ product }: { product: Product }) {
 
         {sizes.length > 0 && (
           <div>
-            <p className="mb-2 text-sm font-semibold text-slate-700">Size</p>
+            <p className="mb-2 text-sm font-semibold text-[var(--muted)]">Size</p>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => (
                 <Btn key={s} active={size === s} onClick={() => setSize(s)}>
@@ -169,11 +169,11 @@ export function Studio({ product }: { product: Product }) {
         )}
 
         <div>
-          <p className="mb-2 text-sm font-semibold text-slate-700">Design</p>
+          <p className="mb-2 text-sm font-semibold text-[var(--muted)]">Design</p>
           <div className="mb-3 flex flex-wrap gap-2">
             {(["text", "art", "upload", "ai"] as Tab[]).map((t) => (
               <Btn key={t} active={tab === t} onClick={() => setTab(t)}>
-                {t === "ai" ? "AI ✨" : t[0]!.toUpperCase() + t.slice(1)}
+                {t === "ai" ? "AI art" : t[0]!.toUpperCase() + t.slice(1)}
               </Btn>
             ))}
           </div>
@@ -183,8 +183,8 @@ export function Studio({ product }: { product: Product }) {
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Your text…"
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="Your text..."
+                className="flex-1 rounded-md border border-[var(--line)] bg-white px-3 py-2"
               />
               <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="h-10 w-12" />
             </div>
@@ -199,16 +199,16 @@ export function Studio({ product }: { product: Product }) {
                     setArtUrl(p.url);
                     setArtLabel(`preset: ${p.label}`);
                   }}
-                  className={`flex h-16 w-16 items-center justify-center rounded-lg border bg-slate-50 ${
-                    artLabel === `preset: ${p.label}` ? "border-slate-900" : "border-slate-200"
+                  className={`flex h-16 w-16 items-center justify-center rounded-md border bg-[var(--surface-muted)] ${
+                    artLabel === `preset: ${p.label}` ? "border-[var(--accent)]" : "border-[var(--line)]"
                   }`}
                 >
                   <img src={p.url} alt={p.label} className="h-10 w-10" />
                 </button>
               ))}
               {artUrl && (
-                <button onClick={() => { setArtUrl(undefined); setArtLabel(undefined); }} className="text-sm text-slate-500 underline">
-                  clear art
+                <button onClick={() => { setArtUrl(undefined); setArtLabel(undefined); }} className="text-sm font-semibold text-[var(--danger)] underline">
+                  Clear art
                 </button>
               )}
             </div>
@@ -230,13 +230,13 @@ export function Studio({ product }: { product: Product }) {
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   placeholder="Describe artwork, e.g. 'a neon howling wolf'"
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+                  className="flex-1 rounded-md border border-[var(--line)] bg-white px-3 py-2"
                 />
                 <Btn active onClick={runAi} disabled={aiBusy}>
-                  {aiBusy ? "…" : "Generate"}
+                  {aiBusy ? "Working..." : "Generate art"}
                 </Btn>
               </div>
-              {aiError && <p className="text-sm text-amber-600">{aiError}</p>}
+              {aiError && <p className="text-sm text-[var(--warning-ink)]">{aiError}</p>}
             </div>
           )}
         </div>
@@ -244,12 +244,12 @@ export function Studio({ product }: { product: Product }) {
         <button
           onClick={addToCart}
           disabled={!variant?.stripePriceId}
-          className="mt-2 rounded-xl bg-slate-900 px-6 py-3 text-lg font-semibold text-white shadow hover:bg-slate-800 disabled:opacity-40"
+          className="mt-2 rounded-md bg-[var(--accent)] px-6 py-3 text-lg font-semibold text-white hover:bg-[var(--accent-hover)] disabled:opacity-40"
         >
-          Add to cart · {money(price)}
+          Add to cart ({money(price)})
         </button>
         {!variant?.stripePriceId && (
-          <p className="text-sm text-amber-600">This variant has no Stripe price configured.</p>
+          <p className="text-sm text-[var(--warning-ink)]">This variant has no Stripe price configured.</p>
         )}
       </div>
     </div>

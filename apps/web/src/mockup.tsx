@@ -38,7 +38,7 @@ export function ProductMockup({
 
   return (
     <div className={`relative aspect-square w-full ${className}`}>
-      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full drop-shadow-sm">
+      <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full">
         {type === "tshirt" && (
           <path
             d="M35 10 L22 16 L8 30 L17 41 L26 35 L26 90 L74 90 L74 35 L83 41 L92 30 L78 16 L65 10 C64 18 36 18 35 10 Z"

@@ -22,7 +22,7 @@ export type SessionDesign = {
 export type SessionCartItem = {
   variantId: string;
   sku: string;
-  productLabel: string; // e.g. "Classic Tee — Black / L"
+  productLabel: string; // e.g. "Classic Tee - Black / L"
   stripePriceId: string | null;
   designId?: string;
   designLabel?: string;
@@ -92,4 +92,11 @@ export function getSession(key: string): SessionState {
 
 export function cartTotalCents(cart: SessionCartItem[]): number {
   return cart.reduce((sum, i) => sum + i.unitPriceCents * i.qty, 0);
+}
+
+export function removeCartLine(cart: SessionCartItem[], lineNumber: number): SessionCartItem | null {
+  const index = Math.floor(lineNumber) - 1;
+  if (index < 0 || index >= cart.length) return null;
+  const [removed] = cart.splice(index, 1);
+  return removed ?? null;
 }

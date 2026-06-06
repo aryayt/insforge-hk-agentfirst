@@ -1,11 +1,23 @@
 {
   "version": 1,
   "skills": {
+    "chatgpt-app-builder": {
+      "source": "mcp-use/mcp-use",
+      "sourceType": "github",
+      "skillPath": "skills/chatgpt-app-builder/SKILL.md",
+      "computedHash": "e9d9aed2478fdb2e009ee884017e6d4c7625ffba9594c5f260fe0770a15a1248"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "9fc469b8e0ee85a7ba2070050997f8e7ebb4ad1d79be3b21770a33392c1e9b93"
+    },
     "mcp-apps-builder": {
       "source": "mcp-use/mcp-use",
       "sourceType": "github",
       "skillPath": "skills/mcp-apps-builder/SKILL.md",
-      "computedHash": "f4fb9e52887a7a22434e2d4c55e1be6d54e2db2d33e04a8da177261aadf5a319"
+      "computedHash": "74ec634e3a7540aa27a81705624abcb782996ed3c3cd4684cf85c17ccd455c88"
     }
   }
 }
