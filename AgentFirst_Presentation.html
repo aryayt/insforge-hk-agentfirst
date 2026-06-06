@@ -1039,71 +1039,94 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
                     <path d="M 185,38 C 203,34 224,42 238,56" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="2" stroke-linecap="round"/>
                   </svg>
                   <!-- MUG PRODUCT SVG -->
+                  <!-- MUG: proper cylinder with D-handle -->
                   <svg id="mugSvgFront" viewBox="0 0 260 300" xmlns="http://www.w3.org/2000/svg" style="display:none;pointer-events:none;">
                     <defs>
-                      <linearGradient id="mugBodyGrad" x1="20%" y1="0%" x2="80%" y2="100%">
-                        <stop offset="0%" stop-color="#38384e"/><stop offset="35%" stop-color="#26263a"/>
-                        <stop offset="75%" stop-color="#181828"/><stop offset="100%" stop-color="#0d0d1a"/>
+                      <linearGradient id="mugBodyGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+                        <stop offset="0%" stop-color="#38384e"/><stop offset="40%" stop-color="#26263a"/>
+                        <stop offset="80%" stop-color="#181828"/><stop offset="100%" stop-color="#0d0d1a"/>
                       </linearGradient>
-                      <linearGradient id="mugLeftShadow" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(0,0,0,0.55)"/><stop offset="28%" stop-color="rgba(0,0,0,0.15)"/>
-                        <stop offset="55%" stop-color="rgba(0,0,0,0)"/>
+                      <linearGradient id="mugShadeL" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="rgba(0,0,0,0.60)"/>
+                        <stop offset="30%" stop-color="rgba(0,0,0,0.18)"/>
+                        <stop offset="60%" stop-color="rgba(0,0,0,0)"/>
                       </linearGradient>
-                      <radialGradient id="mugHighlight" cx="38%" cy="30%" r="38%">
-                        <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/><stop offset="55%" stop-color="rgba(255,255,255,0.05)"/>
+                      <linearGradient id="mugShadeR" x1="100%" y1="0%" x2="0%" y2="0%">
+                        <stop offset="0%" stop-color="rgba(0,0,0,0.40)"/>
+                        <stop offset="35%" stop-color="rgba(0,0,0,0)"/>
+                      </linearGradient>
+                      <radialGradient id="mugHL" cx="36%" cy="35%" r="38%">
+                        <stop offset="0%" stop-color="rgba(255,255,255,0.22)"/>
                         <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
                       </radialGradient>
-                      <linearGradient id="mugBottomFold" x1="0%" y1="100%" x2="0%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(0,0,0,0.50)"/><stop offset="28%" stop-color="rgba(0,0,0,0.14)"/>
-                        <stop offset="52%" stop-color="rgba(0,0,0,0)"/>
+                      <linearGradient id="mugBase" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="rgba(0,0,0,0.45)"/>
+                        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
                       </linearGradient>
                     </defs>
-                    <path d="M 65,66 Q 130,53 195,66 L 189,251 Q 130,265 71,251 Z" fill="url(#mugBodyGrad)" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
-                    <path d="M 65,66 Q 130,53 195,66 L 189,251 Q 130,265 71,251 Z" fill="url(#mugLeftShadow)"/>
-                    <path d="M 65,66 Q 130,53 195,66 L 189,251 Q 130,265 71,251 Z" fill="url(#mugHighlight)"/>
-                    <path d="M 65,66 Q 130,53 195,66 L 189,251 Q 130,265 71,251 Z" fill="url(#mugBottomFold)"/>
-                    <ellipse cx="130" cy="66" rx="65" ry="13" fill="#1e1e2c" stroke="rgba(255,255,255,0.22)" stroke-width="1.2"/>
-                    <ellipse cx="130" cy="63" rx="58" ry="9" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
-                    <ellipse cx="130" cy="255" rx="59" ry="10" fill="#111120" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-                    <path d="M 192,108 Q 248,108 248,160 Q 248,212 192,212" fill="none" stroke="#26263a" stroke-width="16" stroke-linecap="round"/>
-                    <path d="M 192,108 Q 240,108 240,160 Q 240,212 192,212" fill="none" stroke="#38384e" stroke-width="9" stroke-linecap="round"/>
-                    <path d="M 192,108 Q 234,108 234,160 Q 234,212 192,212" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Body: straight sides, slight taper at base -->
+                    <path d="M 62,82 L 198,82 L 194,258 Q 130,272 66,258 Z" fill="url(#mugBodyGrad)" stroke="rgba(255,255,255,0.13)" stroke-width="1"/>
+                    <path d="M 62,82 L 198,82 L 194,258 Q 130,272 66,258 Z" fill="url(#mugShadeL)"/>
+                    <path d="M 62,82 L 198,82 L 194,258 Q 130,272 66,258 Z" fill="url(#mugShadeR)"/>
+                    <path d="M 62,82 L 198,82 L 194,258 Q 130,272 66,258 Z" fill="url(#mugHL)"/>
+                    <path d="M 62,82 L 198,82 L 194,258 Q 130,272 66,258 Z" fill="url(#mugBase)"/>
+                    <!-- Top rim -->
+                    <ellipse cx="130" cy="82" rx="68" ry="14" fill="#1c1c2c" stroke="rgba(255,255,255,0.25)" stroke-width="1.2"/>
+                    <ellipse cx="130" cy="79" rx="60" ry="10" fill="#222236" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+                    <!-- Base -->
+                    <ellipse cx="130" cy="262" rx="64" ry="11" fill="#0f0f1e" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <!-- D-handle right side -->
+                    <path d="M 196,120 Q 252,120 252,175 Q 252,230 196,230" fill="none" stroke="#1c1c2c" stroke-width="20" stroke-linecap="round"/>
+                    <path d="M 196,120 Q 244,120 244,175 Q 244,230 196,230" fill="none" stroke="#2e2e44" stroke-width="12" stroke-linecap="round"/>
+                    <path d="M 196,120 Q 238,120 238,175 Q 238,230 196,230" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Rim inner shadow -->
+                    <ellipse cx="130" cy="84" rx="55" ry="8" fill="rgba(0,0,0,0.35)"/>
                   </svg>
 
-                  <!-- CAP PRODUCT SVG -->
+                  <!-- CAP: structured front panel + flat brim -->
                   <svg id="capSvgFront" viewBox="0 0 260 300" xmlns="http://www.w3.org/2000/svg" style="display:none;pointer-events:none;">
                     <defs>
-                      <linearGradient id="capBodyGrad" x1="20%" y1="0%" x2="75%" y2="100%">
-                        <stop offset="0%" stop-color="#38384e"/><stop offset="35%" stop-color="#26263a"/>
-                        <stop offset="75%" stop-color="#181828"/><stop offset="100%" stop-color="#0d0d1a"/>
+                      <linearGradient id="capBodyGrad" x1="18%" y1="0%" x2="78%" y2="100%">
+                        <stop offset="0%" stop-color="#38384e"/><stop offset="38%" stop-color="#26263a"/>
+                        <stop offset="78%" stop-color="#181828"/><stop offset="100%" stop-color="#0d0d1a"/>
                       </linearGradient>
-                      <linearGradient id="capLeftShadow" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(0,0,0,0.55)"/><stop offset="28%" stop-color="rgba(0,0,0,0.18)"/>
-                        <stop offset="55%" stop-color="rgba(0,0,0,0)"/>
+                      <linearGradient id="capShadeL" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="rgba(0,0,0,0.60)"/>
+                        <stop offset="32%" stop-color="rgba(0,0,0,0.18)"/>
+                        <stop offset="60%" stop-color="rgba(0,0,0,0)"/>
                       </linearGradient>
-                      <radialGradient id="capTopHL" cx="42%" cy="28%" r="40%">
-                        <stop offset="0%" stop-color="rgba(255,255,255,0.20)"/><stop offset="55%" stop-color="rgba(255,255,255,0.05)"/>
+                      <radialGradient id="capHL" cx="40%" cy="28%" r="42%">
+                        <stop offset="0%" stop-color="rgba(255,255,255,0.24)"/>
+                        <stop offset="60%" stop-color="rgba(255,255,255,0.05)"/>
                         <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
                       </radialGradient>
-                      <linearGradient id="capBottomFold" x1="0%" y1="100%" x2="0%" y2="0%">
-                        <stop offset="0%" stop-color="rgba(0,0,0,0.45)"/><stop offset="30%" stop-color="rgba(0,0,0,0.10)"/>
-                        <stop offset="55%" stop-color="rgba(0,0,0,0)"/>
+                      <linearGradient id="capShadB" x1="0%" y1="100%" x2="0%" y2="0%">
+                        <stop offset="0%" stop-color="rgba(0,0,0,0.50)"/>
+                        <stop offset="40%" stop-color="rgba(0,0,0,0)"/>
                       </linearGradient>
-                      <linearGradient id="capBrimGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#1e1e2c"/><stop offset="100%" stop-color="#111118"/>
+                      <linearGradient id="brimGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#222230"/><stop offset="100%" stop-color="#0d0d18"/>
                       </linearGradient>
                     </defs>
-                    <path d="M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z" fill="url(#capBodyGrad)" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
-                    <path d="M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z" fill="url(#capLeftShadow)"/>
-                    <path d="M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z" fill="url(#capTopHL)"/>
-                    <path d="M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z" fill="url(#capBottomFold)"/>
-                    <path d="M 59,185 Q 130,205 201,185" fill="none" stroke="rgba(0,0,0,0.40)" stroke-width="4"/>
-                    <path d="M 59,185 Q 130,205 201,185" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
-                    <path d="M 59,185 Q 130,207 201,185 Q 218,196 220,206 Q 196,228 130,230 Q 62,228 38,206 Q 40,196 59,185 Z" fill="url(#capBrimGrad)" stroke="rgba(255,255,255,0.10)" stroke-width="0.8"/>
-                    <path d="M 59,185 Q 130,207 201,185 Q 218,196 220,206 Q 196,228 130,230 Q 62,228 38,206 Q 40,196 59,185 Z" fill="rgba(0,0,0,0.20)"/>
-                    <path d="M 130,40 L 130,200" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1" stroke-dasharray="3,6"/>
-                    <circle cx="130" cy="44" r="7" fill="#1a1a28" stroke="rgba(255,255,255,0.22)" stroke-width="1.2"/>
-                    <circle cx="130" cy="44" r="3.5" fill="#26263a"/>
+                    <!-- Crown: structured five-panel front -->
+                    <path d="M 48,195 Q 40,140 55,90 Q 72,48 130,42 Q 188,48 205,90 Q 220,140 212,195 Q 175,208 130,210 Q 85,208 48,195 Z" fill="url(#capBodyGrad)" stroke="rgba(255,255,255,0.13)" stroke-width="1"/>
+                    <path d="M 48,195 Q 40,140 55,90 Q 72,48 130,42 Q 188,48 205,90 Q 220,140 212,195 Q 175,208 130,210 Q 85,208 48,195 Z" fill="url(#capShadeL)"/>
+                    <path d="M 48,195 Q 40,140 55,90 Q 72,48 130,42 Q 188,48 205,90 Q 220,140 212,195 Q 175,208 130,210 Q 85,208 48,195 Z" fill="url(#capHL)"/>
+                    <path d="M 48,195 Q 40,140 55,90 Q 72,48 130,42 Q 188,48 205,90 Q 220,140 212,195 Q 175,208 130,210 Q 85,208 48,195 Z" fill="url(#capShadB)"/>
+                    <!-- Sweatband seam -->
+                    <path d="M 48,195 Q 130,215 212,195" fill="none" stroke="rgba(0,0,0,0.45)" stroke-width="5"/>
+                    <path d="M 48,195 Q 130,215 212,195" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="1.5"/>
+                    <!-- Brim (visor) - extends beyond crown -->
+                    <path d="M 30,205 Q 130,230 230,205 Q 242,215 240,226 Q 200,245 130,247 Q 60,245 20,226 Q 18,215 30,205 Z" fill="url(#brimGrad)" stroke="rgba(255,255,255,0.10)" stroke-width="0.8"/>
+                    <!-- Brim underside -->
+                    <path d="M 30,205 Q 130,230 230,205 Q 242,215 240,226 Q 200,245 130,247 Q 60,245 20,226 Q 18,215 30,205 Z" fill="rgba(0,0,0,0.28)"/>
+                    <!-- Brim front edge highlight -->
+                    <path d="M 22,226 Q 130,248 238,226" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+                    <!-- Center seam -->
+                    <path d="M 130,42 L 130,210" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4,7"/>
+                    <!-- Top button -->
+                    <circle cx="130" cy="46" r="8" fill="#1a1a2c" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+                    <circle cx="130" cy="46" r="4" fill="#2a2a40"/>
                   </svg>
 
                   <canvas class="shirt-canvas-layer" id="frontCanvas" width="260" height="300"></canvas>
@@ -1387,10 +1410,10 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
   function getMugPath(w, h) {
     const sx = w/260, sy = h/300;
     const p = new Path2D();
-    p.moveTo(65*sx, 66*sy);
-    p.quadraticCurveTo(130*sx, 53*sy, 195*sx, 66*sy);
-    p.lineTo(189*sx, 251*sy);
-    p.quadraticCurveTo(130*sx, 265*sy, 71*sx, 251*sy);
+    p.moveTo(62*sx, 82*sy);
+    p.lineTo(198*sx, 82*sy);
+    p.lineTo(194*sx, 258*sy);
+    p.quadraticCurveTo(130*sx, 272*sy, 66*sx, 258*sy);
     p.closePath();
     return p;
   }
@@ -1398,13 +1421,13 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
   function getCapPath(w, h) {
     const sx = w/260, sy = h/300;
     const p = new Path2D();
-    p.moveTo(61*sx, 185*sy);
-    p.quadraticCurveTo(50*sx, 137*sy, 59*sx, 97*sy);
-    p.quadraticCurveTo(74*sx, 51*sy, 130*sx, 40*sy);
-    p.quadraticCurveTo(186*sx, 51*sy, 201*sx, 97*sy);
-    p.quadraticCurveTo(210*sx, 137*sy, 199*sx, 185*sy);
-    p.quadraticCurveTo(173*sx, 199*sy, 130*sx, 201*sy);
-    p.quadraticCurveTo(87*sx, 199*sy, 61*sx, 185*sy);
+    p.moveTo(48*sx, 195*sy);
+    p.quadraticCurveTo(40*sx, 140*sy, 55*sx, 90*sy);
+    p.quadraticCurveTo(72*sx, 48*sy, 130*sx, 42*sy);
+    p.quadraticCurveTo(188*sx, 48*sy, 205*sx, 90*sy);
+    p.quadraticCurveTo(220*sx, 140*sy, 212*sx, 195*sy);
+    p.quadraticCurveTo(175*sx, 208*sy, 130*sx, 210*sy);
+    p.quadraticCurveTo(85*sx, 208*sy, 48*sx, 195*sy);
     p.closePath();
     return p;
   }
@@ -1755,8 +1778,8 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
 
   // Clip-path strings per product (260×300 canvas space)
   const SHIRT_CLIP = 'path("M 100,34 C 109,48 121,55 130,55 C 139,55 151,48 160,34 C 176,30 194,37 206,49 L 241,67 C 253,76 255,91 247,101 L 226,109 C 215,114 207,108 206,97 L 206,281 L 54,281 L 54,97 C 53,108 45,114 34,109 L 13,101 C 5,91 7,76 19,67 L 54,49 C 66,37 84,30 100,34 Z")';
-  const MUG_CLIP   = 'path("M 65,66 Q 130,53 195,66 L 189,251 Q 130,265 71,251 Z")';
-  const CAP_CLIP   = 'path("M 61,185 Q 50,137 59,97 Q 74,51 130,40 Q 186,51 201,97 Q 210,137 199,185 Q 173,199 130,201 Q 87,199 61,185 Z")';
+  const MUG_CLIP   = 'path("M 62,82 L 198,82 L 194,258 Q 130,272 66,258 Z")';
+  const CAP_CLIP   = 'path("M 48,195 Q 40,140 55,90 Q 72,48 130,42 Q 188,48 205,90 Q 220,140 212,195 Q 175,208 130,210 Q 85,208 48,195 Z")';
 
   function getOrCreateOverlay(face) {
     const id = 'aiOverlay_' + face;
