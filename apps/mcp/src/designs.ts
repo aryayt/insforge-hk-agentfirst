@@ -82,7 +82,51 @@ export async function importArtwork(imageUrl: string): Promise<StoredArtwork> {
   return storeBytes(blob, contentType);
 }
 
-/** Generate artwork from a text prompt via an OpenRouter image-capable model. */
+/**
+ * Generate + persist a design from a prompt.
+ * Primary path: the `generate-design` InsForge edge function — keys live as
+ * InsForge SECRETS (GOOGLE_AI_API_KEY / OPENAI_API_KEY), nothing local needed.
+ * Fallback: direct OpenRouter call if a local OPENROUTER_API_KEY is set.
+ */
+export async function generateDesign(args: {
+  prompt: string;
+  label?: string;
+  sessionKey: string;
+  agentSource: string;
+}): Promise<PersistedDesign> {
+  const { data, error } = await admin.functions.invoke("generate-design", {
+    body: {
+      prompt: args.prompt,
+      label: args.label,
+      sessionKey: args.sessionKey,
+      agentSource: args.agentSource,
+    },
+  });
+  if (!error) {
+    const design = (data as { design?: PersistedDesign })?.design;
+    if (design?.id && design.imageUrl) return design;
+  }
+
+  // Fallback: local OpenRouter key (dev machines without the function deployed).
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error(
+      `AI generation unavailable: edge function failed (${error ? (error as Error).message ?? "error" : "bad response"}) ` +
+        "and no local OPENROUTER_API_KEY. Deploy it with: bunx @insforge/cli functions deploy generate-design --file functions/generate-design.ts — " +
+        "or generate the image in ChatGPT and pass imageUrl.",
+    );
+  }
+  const art = await generateArtwork(args.prompt);
+  return persistDesign({
+    source: "ai",
+    prompt: args.prompt,
+    label: args.label ?? args.prompt.slice(0, 60),
+    art,
+    sessionKey: args.sessionKey,
+    agentSource: args.agentSource,
+  });
+}
+
+/** Generate artwork from a text prompt via an OpenRouter image-capable model (fallback path). */
 export async function generateArtwork(prompt: string): Promise<StoredArtwork> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {

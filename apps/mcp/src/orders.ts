@@ -122,15 +122,21 @@ export async function createGuestCheckout(
   if (iErr) throw iErr;
 
   const publicUrl = process.env.MCP_PUBLIC_URL ?? `http://localhost:${process.env.MCP_PORT ?? 8788}`;
-  const { data, error } = await admin.payments.createCheckoutSession("test", {
-    mode: "payment",
+  // Built as a variable (not an inline literal) so the extra `allowPromotionCodes`
+  // passthrough survives SDK excess-property checks. It shows Stripe's
+  // "Add promotion code" field (codes seeded by scripts/seed/stripe-coupon.ts);
+  // if the InsForge payments API strips it, the field simply won't appear.
+  const checkoutBody = {
+    mode: "payment" as const,
+    allowPromotionCodes: true,
     lineItems: cart.map((i) => ({ stripePriceId: i.stripePriceId as string, quantity: i.qty })),
     successUrl: `${publicUrl}/checkout/success?order=${order.id}&t=${guestToken}`,
     cancelUrl: `${publicUrl}/checkout/cancel?order=${order.id}`,
     customerEmail: email ?? null,
     metadata: { order_id: order.id },
     idempotencyKey: `order:${order.id}`,
-  });
+  };
+  const { data, error } = await admin.payments.createCheckoutSession("test", checkoutBody);
   if (error) throw new Error(`Checkout session failed: ${error.message ?? String(error)}`);
   const session = (data as { checkoutSession?: { id?: string; url?: string } })?.checkoutSession;
   if (!session?.url) throw new Error("Stripe returned no checkout URL.");

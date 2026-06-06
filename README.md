@@ -35,18 +35,17 @@ bun run mcp:dev    # MCP server  → http://localhost:8788/mcp (inspector: /insp
 bun run web:dev    # storefront  → http://localhost:5173
 ```
 
-### Keys — where to put yours
+### Keys — all centralized in InsForge 🔑
 
-All in `.env.local` (gitignored — **never commit keys**):
+**Teammates need NO local API keys.** Everything lives as InsForge secrets (dashboard → Functions → Secrets): `GOOGLE_AI_API_KEY`, `OPENAI_API_KEY`, Stripe test keys — already set. AI image generation runs through the `generate-design` edge function which reads those secrets server-side.
 
-| Var | Who needs it | What for |
-|---|---|---|
-| `OPENROUTER_API_KEY` | **← teammates: put your OpenRouter/GMI key here** | AI image generation (`create_design` prompt mode) |
-| `OPENROUTER_IMAGE_MODEL` | optional | default `google/gemini-2.5-flash-image` |
-| `STRIPE_SECRET_KEY` | only for re-running the price seed | `sk_test_...` — already configured in InsForge payments |
-| `INSFORGE_API_KEY` | auto via `.insforge/project.json` | server-side admin key |
+One-time (already done if `bunx @insforge/cli functions list` shows it active):
 
-GMI users: if your key is OpenRouter-compatible, set it as `OPENROUTER_API_KEY`; otherwise ping the channel and we'll add a provider switch.
+```bash
+bunx @insforge/cli functions deploy generate-design --file functions/generate-design.ts
+```
+
+Optional local-only fallback: `OPENROUTER_API_KEY` in `.env.local` (used only if the edge function is unreachable). Never commit keys.
 
 ## Test it
 

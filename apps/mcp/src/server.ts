@@ -1,6 +1,6 @@
 import { createMCPServer } from "mcp-use/server";
 import { getProduct, listProducts } from "./catalog";
-import { generateArtwork, importArtwork, persistDesign } from "./designs";
+import { generateDesign, importArtwork, persistDesign } from "./designs";
 import {
   createGuestCheckout,
   findVariantBySku,
@@ -120,17 +120,23 @@ server.tool({
   ) => {
     if (!prompt && !imageUrl) return fail("Pass a prompt (to generate) or an imageUrl (to import).");
     try {
-      const art = imageUrl ? await importArtwork(imageUrl) : await generateArtwork(prompt!);
       const caller = callerInfo(ctx);
       const session = getSession(caller.sessionKey);
-      const persisted = await persistDesign({
-        source: imageUrl ? "upload" : "ai",
-        prompt,
-        label: label ?? prompt?.slice(0, 60) ?? "Imported design",
-        art,
-        sessionKey: caller.sessionKey,
-        agentSource: caller.agentSource,
-      });
+      const persisted = imageUrl
+        ? await persistDesign({
+            source: "upload",
+            prompt,
+            label: label ?? prompt?.slice(0, 60) ?? "Imported design",
+            art: await importArtwork(imageUrl),
+            sessionKey: caller.sessionKey,
+            agentSource: caller.agentSource,
+          })
+        : await generateDesign({
+            prompt: prompt!,
+            label,
+            sessionKey: caller.sessionKey,
+            agentSource: caller.agentSource,
+          });
       const design = {
         id: persisted.id,
         label: persisted.label,
