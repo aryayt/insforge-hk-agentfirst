@@ -53,7 +53,8 @@ Wired via `insforge payments`:
 
 - **Guest checkout**: `migrations/20260606193000_guest-checkout.sql` makes `orders`/`order_items.user_id` nullable, adds `email`, `guest_token`, `design_preview_url`, and per-item `product_label`/`design_label` snapshots. The MCP server (admin client) writes guest orders directly.
 - **Paid-marking (demo)**: token-gated `/checkout/success` redirect sets `orders.status='paid'`. **Production TODO**: webhook-backed trigger on `payments.payment_history` (`type='one_time_payment' AND status='succeeded'` → mark order via `metadata->>'order_id'`), then remove the redirect-marking path.
-- **Designs (guest)**: artwork bytes live in the `designs` bucket under `guest/`; no `designs` table row (it requires `auth.users`) — order snapshots carry the label + preview URL. The authenticated v1 restores `designs` rows.
+- **Designs (guest)**: artwork bytes live in the `designs` bucket under `guest/`; `migrations/20260606213000_agent-attribution.sql` makes `designs.user_id` nullable and adds `label`, `session_key`, `agent_source` — guest designs now persist as rows and `order_items.design_id` links to them.
+- **Attribution**: `orders.customer_name`, `agent_source` (MCP client name, e.g. `openai-mcp`; `web` for storefront), `agent_user_subject` (stable per-ChatGPT-account id, advisory), `agent_locale`. Web checkout should set `agent_source='web'` (TODO in apps/web).
 
 ## Conventions
 

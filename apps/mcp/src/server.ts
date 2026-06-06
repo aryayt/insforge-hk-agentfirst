@@ -1,13 +1,13 @@
 import { createMCPServer } from "mcp-use/server";
 import { getProduct, listProducts } from "./catalog";
-import { generateArtwork, importArtwork } from "./designs";
+import { generateArtwork, importArtwork, persistDesign } from "./designs";
 import {
   createGuestCheckout,
   findVariantBySku,
   getOrder,
   markPaidFromSuccessRedirect,
 } from "./orders";
-import { cartTotalCents, getSession, sessionKey } from "./session";
+import { callerInfo, cartTotalCents, getSession, sessionKey } from "./session";
 
 const server = createMCPServer("agent-shop", {
   version: "0.1.0",
@@ -121,13 +121,22 @@ server.tool({
     if (!prompt && !imageUrl) return fail("Pass a prompt (to generate) or an imageUrl (to import).");
     try {
       const art = imageUrl ? await importArtwork(imageUrl) : await generateArtwork(prompt!);
-      const session = getSession(sessionKey(ctx));
-      const design = {
-        id: crypto.randomUUID(),
-        label: label ?? prompt?.slice(0, 60) ?? "Imported design",
+      const caller = callerInfo(ctx);
+      const session = getSession(caller.sessionKey);
+      const persisted = await persistDesign({
+        source: imageUrl ? "upload" : "ai",
         prompt,
-        imageUrl: art.url,
-        imageKey: art.key,
+        label: label ?? prompt?.slice(0, 60) ?? "Imported design",
+        art,
+        sessionKey: caller.sessionKey,
+        agentSource: caller.agentSource,
+      });
+      const design = {
+        id: persisted.id,
+        label: persisted.label,
+        prompt,
+        imageUrl: persisted.imageUrl,
+        imageKey: persisted.imageKey,
         createdAt: Date.now(),
       };
       session.designs.set(design.id, design);
@@ -230,12 +239,25 @@ server.tool({
       description: "Optional customer email for the Stripe receipt.",
       required: false,
     },
+    {
+      name: "name",
+      type: "string",
+      description: "Optional customer name (ask the user; stored on the order).",
+      required: false,
+    },
   ],
   annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
-  cb: async ({ email }: { email?: string }, ctx: unknown) => {
+  cb: async ({ email, name }: { email?: string; name?: string }, ctx: unknown) => {
     try {
-      const session = getSession(sessionKey(ctx));
-      const result = await createGuestCheckout(session.cart, email);
+      const caller = callerInfo(ctx);
+      const session = getSession(caller.sessionKey);
+      const result = await createGuestCheckout(session.cart, {
+        email,
+        customerName: name,
+        agentSource: caller.agentSource,
+        userSubject: caller.userSubject,
+        locale: caller.locale,
+      });
       session.lastOrderId = result.orderId;
       session.cart = [];
       return {

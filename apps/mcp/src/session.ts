@@ -39,13 +39,46 @@ type SessionState = {
 
 const sessions = new Map<string, SessionState>();
 
+export type CallerInfo = {
+  sessionKey: string;
+  /** MCP client name, e.g. "openai-mcp" (ChatGPT), "claude-ai", "mcp-use-inspector". */
+  agentSource: string;
+  /** Stable per-ChatGPT-account opaque id (advisory, not verified identity). */
+  userSubject: string | null;
+  locale: string | null;
+};
+
+type CtxShape = {
+  client?: {
+    info?: () => { name?: string; version?: string } | undefined;
+    user?: () =>
+      | { subject?: string; conversationId?: string; locale?: string }
+      | undefined;
+  };
+};
+
+/** Extract caller identity/attribution from the mcp-use tool context (2nd cb arg). */
+export function callerInfo(ctx: unknown): CallerInfo {
+  const c = ctx as CtxShape | undefined;
+  let user: ReturnType<NonNullable<NonNullable<CtxShape["client"]>["user"]>> | undefined;
+  let info: ReturnType<NonNullable<NonNullable<CtxShape["client"]>["info"]>> | undefined;
+  try {
+    user = c?.client?.user?.();
+    info = c?.client?.info?.();
+  } catch {
+    /* non-conforming client */
+  }
+  return {
+    sessionKey: user?.subject ?? user?.conversationId ?? "shared",
+    agentSource: info?.name ?? "unknown-mcp-client",
+    userSubject: user?.subject ?? null,
+    locale: user?.locale ?? null,
+  };
+}
+
 /** Derive a session key from the mcp-use tool context (2nd cb arg). */
 export function sessionKey(ctx: unknown): string {
-  const c = ctx as
-    | { client?: { user?: () => { subject?: string; conversationId?: string } | undefined } }
-    | undefined;
-  const user = c?.client?.user?.();
-  return user?.subject ?? user?.conversationId ?? "shared";
+  return callerInfo(ctx).sessionKey;
 }
 
 export function getSession(key: string): SessionState {

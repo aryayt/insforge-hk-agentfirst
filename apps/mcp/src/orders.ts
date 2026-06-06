@@ -59,10 +59,19 @@ export type CheckoutResult = {
   amountCents: number;
 };
 
+export type CheckoutAttribution = {
+  email?: string;
+  customerName?: string;
+  agentSource?: string;
+  userSubject?: string | null;
+  locale?: string | null;
+};
+
 export async function createGuestCheckout(
   cart: SessionCartItem[],
-  email?: string,
+  attribution: CheckoutAttribution = {},
 ): Promise<CheckoutResult> {
+  const { email } = attribution;
   if (cart.length === 0) throw new Error("Cart is empty — add something first.");
 
   const missing = cart.filter((i) => !i.stripePriceId);
@@ -87,6 +96,10 @@ export async function createGuestCheckout(
         email: email ?? null,
         guest_token: guestToken,
         design_preview_url: previewUrl,
+        customer_name: attribution.customerName ?? null,
+        agent_source: attribution.agentSource ?? null,
+        agent_user_subject: attribution.userSubject ?? null,
+        agent_locale: attribution.locale ?? null,
       },
     ])
     .select();
@@ -99,7 +112,7 @@ export async function createGuestCheckout(
       order_id: order.id,
       user_id: null,
       variant_id: i.variantId,
-      design_id: null,
+      design_id: i.designId ?? null,
       qty: i.qty,
       unit_price_cents: i.unitPriceCents,
       product_label: i.productLabel,

@@ -3,10 +3,47 @@
  * ChatGPT) or generate via an OpenRouter image model — then persist the bytes
  * in the InsForge `designs` Storage bucket (persist BOTH url and key).
  *
- * No `designs` table row in the guest demo (it requires auth.users); the
- * durable artifacts are the Storage object + label/url snapshots on the order.
+ * Guest designs persist as `designs` rows (user_id NULL) with session/agent
+ * provenance — see migrations/20260606213000_agent-attribution.sql.
  */
 import { admin } from "./insforge";
+
+export type PersistedDesign = {
+  id: string;
+  label: string;
+  imageUrl: string;
+  imageKey: string;
+};
+
+/** Insert a guest `designs` row so artwork shows up in /data and survives restarts. */
+export async function persistDesign(args: {
+  source: "ai" | "upload";
+  prompt?: string;
+  label: string;
+  art: StoredArtwork;
+  sessionKey: string;
+  agentSource: string;
+}): Promise<PersistedDesign> {
+  const { data, error } = await admin.database
+    .from("designs")
+    .insert([
+      {
+        user_id: null,
+        source: args.source,
+        prompt: args.prompt ?? null,
+        image_url: args.art.url,
+        image_key: args.art.key,
+        label: args.label,
+        session_key: args.sessionKey,
+        agent_source: args.agentSource,
+      },
+    ])
+    .select();
+  if (error) throw new Error(`Could not save design row: ${error.message ?? String(error)}`);
+  const row = (data as Array<{ id: string }>)[0];
+  if (!row?.id) throw new Error("Design insert returned no id.");
+  return { id: row.id, label: args.label, imageUrl: args.art.url, imageKey: args.art.key };
+}
 
 const BUCKET = "designs";
 const MAX_BYTES = 15 * 1024 * 1024;
