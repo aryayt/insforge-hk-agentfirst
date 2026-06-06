@@ -3,8 +3,11 @@
  *   coupon  AGENT50  → 50% off, single use per customer
  *   code    AGENT50  → what users type at checkout
  *
- * Checkout sessions are created with allowPromotionCodes, so Stripe shows an
- * "Add promotion code" field. Idempotent — safe to re-run.
+ * NOTE: InsForge's createCheckoutSession schema is strict and has no promo/coupon
+ * field, so this code does NOT auto-apply at our InsForge-backed checkout. It exists
+ * as a Stripe artifact (usable if checkout is ever created directly via Stripe). For
+ * the demo the discount is baked into the price instead (see demo-pricing.ts → $2).
+ * Idempotent — safe to re-run.
  *
  * Run:  set -a; source .env.local; set +a; bun scripts/seed/stripe-coupon.ts
  * Custom: COUPON_CODE=ASTRO10 COUPON_PERCENT=10 bun scripts/seed/stripe-coupon.ts
@@ -58,4 +61,5 @@ const promo = await stripe(
 
 console.log(`✓ Coupon ${coupon.id}: ${PERCENT}% off (once)`);
 console.log(`✓ Promotion code: ${promo.code} (${promo.active ? "active" : "INACTIVE"})`);
-console.log(`\nAt checkout, click "Add promotion code" and enter ${promo.code}.`);
+console.log(`\nNote: InsForge checkout has no promo field — for the demo the discount is`);
+console.log(`baked into the price (demo-pricing.ts). This code is a Stripe-only artifact.`);

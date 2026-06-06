@@ -11,7 +11,7 @@
  * production path is a webhook-backed trigger on payments.payment_history —
  * see docs/BACKEND.md.
  */
-import { admin } from "./insforge";
+import { admin, anon } from "./insforge";
 import type { SessionCartItem } from "./session";
 import { cartTotalCents } from "./session";
 
@@ -121,14 +121,15 @@ export async function createGuestCheckout(
   );
   if (iErr) throw iErr;
 
-  const publicUrl = process.env.MCP_PUBLIC_URL ?? `http://localhost:${process.env.MCP_PORT ?? 8788}`;
-  // Built as a variable (not an inline literal) so the extra `allowPromotionCodes`
-  // passthrough survives SDK excess-property checks. It shows Stripe's
-  // "Add promotion code" field (codes seeded by scripts/seed/stripe-coupon.ts);
-  // if the InsForge payments API strips it, the field simply won't appear.
+  // `||` (not `??`) so an empty MCP_PUBLIC_URL placeholder in .env falls back to
+  // localhost rather than producing a relative URL (InsForge requires absolute URLs).
+  const publicUrl = process.env.MCP_PUBLIC_URL || `http://localhost:${process.env.MCP_PORT || 8788}`;
+  // InsForge's createCheckoutSessionBodySchema is strict — verified against
+  // @insforge/shared-schemas: only mode/lineItems/successUrl/cancelUrl/subject/
+  // customerEmail/metadata/idempotencyKey are accepted. There is no coupon/promo
+  // field, so discounts must be baked into the Stripe Price (see demo-pricing.ts).
   const checkoutBody = {
     mode: "payment" as const,
-    allowPromotionCodes: true,
     lineItems: cart.map((i) => ({ stripePriceId: i.stripePriceId as string, quantity: i.qty })),
     successUrl: `${publicUrl}/checkout/success?order=${order.id}&t=${guestToken}`,
     cancelUrl: `${publicUrl}/checkout/cancel?order=${order.id}`,
@@ -136,7 +137,13 @@ export async function createGuestCheckout(
     metadata: { order_id: order.id },
     idempotencyKey: `order:${order.id}`,
   };
-  const { data, error } = await admin.payments.createCheckoutSession("test", checkoutBody);
+  if (!anon) {
+    throw new Error(
+      "Checkout needs the anon key. Set INSFORGE_ANON_KEY (deploy) or VITE_INSFORGE_ANON_KEY (local). " +
+        "InsForge's payments API rejects the admin/service key for checkout sessions.",
+    );
+  }
+  const { data, error } = await anon.payments.createCheckoutSession("test", checkoutBody);
   if (error) throw new Error(`Checkout session failed: ${error.message ?? String(error)}`);
   const session = (data as { checkoutSession?: { id?: string; url?: string } })?.checkoutSession;
   if (!session?.url) throw new Error("Stripe returned no checkout URL.");
