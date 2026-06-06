@@ -26,16 +26,39 @@ function sessionKey(): string {
   }
 }
 
-type GenerateResponse = { design?: GeneratedDesign; error?: string };
+type GenerateResponse = { design?: GeneratedDesign; error?: string; message?: string };
+
+/**
+ * Pull the clearest human message out of whatever the SDK hands back. On a
+ * non-2xx the SDK throws an InsForgeError whose `.message` is the function's
+ * `message` field and `.error` its `error` field, with extra keys (e.g.
+ * `reason`) copied on — so a content block surfaces its real explanation
+ * instead of a generic "502 Bad Gateway".
+ */
+function generationErrorMessage(error: unknown, data: unknown): string {
+  const pick = (o: unknown): string | undefined => {
+    if (!o || typeof o !== "object") return undefined;
+    const r = o as Record<string, unknown>;
+    for (const k of ["message", "error", "reason"]) {
+      const v = r[k];
+      if (typeof v === "string" && v.trim()) return v;
+    }
+    return undefined;
+  };
+  const fromBody = pick(error) ?? pick(data);
+  if (fromBody) return fromBody;
+  if (error instanceof Error && error.message) return error.message;
+  return "Generation failed. Try again.";
+}
 
 async function invokeGenerate(body: Record<string, unknown>): Promise<GeneratedDesign> {
   const { data, error } = await insforge.functions.invoke("generate-design", {
     body: { sessionKey: sessionKey(), agentSource: "web", ...body },
   });
-  if (error) throw error instanceof Error ? error : new Error(String(error));
+  if (error) throw new Error(generationErrorMessage(error, data));
   const design = (data as GenerateResponse)?.design;
   if (!design?.imageUrl) {
-    throw new Error((data as GenerateResponse)?.error || "Generation returned no design.");
+    throw new Error(generationErrorMessage(null, data) || "Generation returned no design.");
   }
   return design;
 }

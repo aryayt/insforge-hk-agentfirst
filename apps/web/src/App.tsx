@@ -92,6 +92,7 @@ export function App() {
     // Fire all variations at once but stream each into the UI as it lands, so the
     // first design shows after ~one model call instead of waiting for the slowest.
     let any = false;
+    let firstError: string | null = null;
     const jobs = Array.from({ length: VARIATION_COUNT }, () =>
       generateDesign(q, TEE_ASPECT_RATIO)
         .then((d) => {
@@ -99,10 +100,14 @@ export function App() {
           setVariations((v) => [...v, d]);
           setDesign((cur) => cur ?? d); // auto-select the first to arrive
         })
-        .catch(() => {}),
+        .catch((e) => {
+          // Keep the first real reason (e.g. a content-safety block) so the user
+          // sees *why* it failed instead of a generic "try again".
+          if (!firstError) firstError = e instanceof Error ? e.message : String(e);
+        }),
     );
     await Promise.allSettled(jobs);
-    if (!any) setImgError("Couldn't generate. Try again.");
+    if (!any) setImgError(firstError ?? "Couldn't generate. Try again.");
     setLoading(false);
   }
 
@@ -303,6 +308,10 @@ export function App() {
               printfulVariantId={variant?.printfulVariantId ?? null}
               color={shirtColor === "white" ? "White" : "Black"}
               size={size}
+              printArea={printArea}
+              placement={placement}
+              text={text}
+              textColor={textColor}
             />
           </div>
         </section>

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { PrintArea } from "@app/shared";
 import { renderPrintfulMockup } from "../lib/mockup";
+import { buildPlacedArtworkUrl, placementSignature } from "../lib/printFile";
+import { DEFAULT_PLACEMENT, type Placement } from "./ShirtPreview";
 
 type Props = {
   /** Persisted https artwork URL (the design's Storage URL). null → nothing to render. */
@@ -8,6 +11,11 @@ type Props = {
   printfulVariantId: number | null;
   color: string;
   size: string | null;
+  /** Print box + the user's move/resize, so the Printful render matches the studio. */
+  printArea: PrintArea;
+  placement?: Placement;
+  text?: string;
+  textColor?: string;
 };
 
 type PfState =
@@ -22,13 +30,24 @@ type PfState =
  * cached by (variantId, artworkUrl), and shows clear loading/empty/error states —
  * the local hero preview is always there, so this never blocks the studio.
  */
-export function PrintfulMockupCard({ artworkUrl, printfulVariantId, color, size }: Props) {
+export function PrintfulMockupCard({
+  artworkUrl,
+  printfulVariantId,
+  color,
+  size,
+  printArea,
+  placement = DEFAULT_PLACEMENT,
+  text,
+  textColor,
+}: Props) {
   const [pf, setPf] = useState<PfState>({ kind: "idle", reason: "no-art" });
   const cache = useRef<Map<string, { imageUrl: string; elapsedMs: number }>>(new Map());
   const [nonce, setNonce] = useState(0);
 
+  // Key includes placement + text so moving/resizing re-renders the real mockup.
+  const sig = artworkUrl ? placementSignature(artworkUrl, placement, text, textColor) : "";
   const canRender = !!artworkUrl && !!printfulVariantId;
-  const cacheKey = canRender ? `${printfulVariantId}:${artworkUrl}` : "";
+  const cacheKey = canRender ? `${printfulVariantId}:${sig}` : "";
 
   useEffect(() => {
     if (!artworkUrl) return setPf({ kind: "idle", reason: "no-art" });
@@ -41,9 +60,19 @@ export function PrintfulMockupCard({ artworkUrl, printfulVariantId, color, size 
     setPf({ kind: "loading" });
     const t = setTimeout(async () => {
       try {
+        // Bake the move/resize into a print-area-sized file, then let Printful
+        // fill the area with it — so the real mockup matches the studio.
+        const placedUrl = await buildPlacedArtworkUrl({
+          imageUrl: artworkUrl,
+          printArea,
+          placement,
+          text,
+          textColor,
+        });
+        if (cancelled) return;
         const res = await renderPrintfulMockup({
           printfulVariantId,
-          artworkUrl,
+          artworkUrl: placedUrl,
           color,
           size,
         });
@@ -58,7 +87,7 @@ export function PrintfulMockupCard({ artworkUrl, printfulVariantId, color, size 
       cancelled = true;
       clearTimeout(t);
     };
-  }, [artworkUrl, printfulVariantId, cacheKey, color, size, nonce]);
+  }, [artworkUrl, printfulVariantId, cacheKey, color, size, nonce, printArea, placement, text, textColor]);
 
   function refresh() {
     cache.current.delete(cacheKey);
