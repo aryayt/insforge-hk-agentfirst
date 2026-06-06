@@ -17,12 +17,15 @@ import {
 import { PrintReadyPanel } from "./components/PrintReadyPanel";
 import { PrintfulMockupCard } from "./components/MockupCompare";
 import { ProductInfoPanel } from "./components/ProductInfoPanel";
+import { OrderStatusCard } from "./components/OrderStatusCard";
 import { PRINTFUL_PRODUCT_BY_SLUG } from "./lib/mockup";
 import { AccountControl } from "./components/AccountControl";
 import { useAuth } from "./lib/auth";
 
 const printArea = DEFAULT_TSHIRT_PRINT_AREA;
 const TEE_ASPECT_RATIO = aspectRatioForProduct("tshirt");
+const SHIP_INPUT =
+  "w-full rounded-xl border border-zinc-300 px-3.5 py-2 text-sm outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10";
 const SIZES = ["S", "M", "L", "XL"] as const;
 type Size = (typeof SIZES)[number];
 
@@ -36,6 +39,7 @@ const EXAMPLES = [
 ];
 
 const checkoutParam = new URLSearchParams(window.location.search).get("checkout");
+const orderParam = new URLSearchParams(window.location.search).get("order");
 
 export function App() {
   const { user, requireAuth } = useAuth();
@@ -66,6 +70,21 @@ export function App() {
   const [size, setSize] = useState<Size>("M");
   const [qty, setQty] = useState(1);
   const [email, setEmail] = useState("");
+
+  // shipping (required for fulfillment)
+  const [ship, setShip] = useState({
+    name: "",
+    address1: "",
+    address2: "",
+    city: "",
+    state: "",
+    country: "US",
+    zip: "",
+  });
+  const setShipField = (k: keyof typeof ship) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setShip((s) => ({ ...s, [k]: e.target.value }));
+  const shippingValid =
+    !!ship.address1.trim() && !!ship.city.trim() && !!ship.country.trim() && !!ship.zip.trim();
 
   // checkout
   const [buying, setBuying] = useState(false);
@@ -174,27 +193,27 @@ export function App() {
   const totalCents = unitPriceCents != null ? unitPriceCents * qty : null;
 
   const hasDesign = !!design || !!text.trim();
-  const canBuy = hasDesign && !!variant?.stripePriceId && !buying;
+  const canBuy = hasDesign && !!variant?.sku && shippingValid && !buying;
 
   async function handleBuy() {
-    if (!variant?.stripePriceId) return;
+    if (!variant?.sku || !shippingValid) return;
     if (!requireAuth()) return; // must be signed in to buy
     setBuying(true);
     setBuyError(null);
     try {
       await buyNow({
-        stripePriceId: variant.stripePriceId,
+        sku: variant.sku,
         quantity: qty,
         email: email.trim() || undefined,
-        metadata: {
-          product: tee?.name ?? "Classic Tee",
-          color: shirtColor,
-          size,
-          ...(design ? { design_id: design.id, design_preview_url: design.imageUrl } : {}),
-          design_prompt: (prompt || (design ? "uploaded art" : "text only")).slice(0, 400),
-          ...(text.trim() ? { design_text: text.trim().slice(0, 400) } : {}),
-          ...(user ? { user_id: user.id } : {}),
-          agent_source: "web",
+        designId: design?.id,
+        shipping: {
+          name: ship.name.trim() || undefined,
+          address1: ship.address1.trim(),
+          address2: ship.address2.trim() || undefined,
+          city: ship.city.trim(),
+          state: ship.state.trim() || undefined,
+          country: ship.country.trim(),
+          zip: ship.zip.trim(),
         },
       });
     } catch (e) {
@@ -222,9 +241,10 @@ export function App() {
         </div>
       </header>
 
-      {checkoutParam === "success" && (
+      {checkoutParam === "success" && !orderParam && (
         <Banner tone="ok">Payment received — thanks! Your order is being processed.</Banner>
       )}
+      {checkoutParam === "success" && orderParam && <OrderStatusCard orderId={orderParam} />}
       {checkoutParam === "canceled" && (
         <Banner tone="warn">Checkout canceled — your design is still here.</Banner>
       )}
@@ -546,6 +566,23 @@ export function App() {
               placeholder="you@example.com (for the receipt)"
               className="w-full rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10"
             />
+
+            {/* Shipping address — required so the order can be fulfilled by Printful */}
+            <p className="mb-2 mt-4 text-xs font-medium text-zinc-600">Ship to</p>
+            <div className="space-y-2">
+              <input value={ship.name} onChange={setShipField("name")} placeholder="Full name" className={SHIP_INPUT} />
+              <input value={ship.address1} onChange={setShipField("address1")} placeholder="Address line 1" className={SHIP_INPUT} />
+              <input value={ship.address2} onChange={setShipField("address2")} placeholder="Address line 2 (optional)" className={SHIP_INPUT} />
+              <div className="grid grid-cols-2 gap-2">
+                <input value={ship.city} onChange={setShipField("city")} placeholder="City" className={SHIP_INPUT} />
+                <input value={ship.state} onChange={setShipField("state")} placeholder="State / Province" className={SHIP_INPUT} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input value={ship.zip} onChange={setShipField("zip")} placeholder="ZIP / Postal" className={SHIP_INPUT} />
+                <input value={ship.country} onChange={setShipField("country")} placeholder="Country (ISO, e.g. US)" maxLength={2} className={SHIP_INPUT} />
+              </div>
+            </div>
+
             <div className="mt-4 flex items-center justify-between gap-4">
               <div>
                 <div className="text-2xl font-semibold tracking-tight">
