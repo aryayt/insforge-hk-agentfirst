@@ -76,7 +76,7 @@ MCP loop in the inspector (`http://localhost:8788/inspector`):
 
 ## Connect to ChatGPT
 
-See **[docs/RUNBOOK-demo.md](./docs/RUNBOOK-demo.md)** — deploy with `bunx @insforge/cli compute deploy . --name agent-shop-mcp --port 8788 --env-file .env.deploy`, then add `https://<endpoint>/mcp` as a ChatGPT connector (Developer mode, No Auth).
+See **[docs/DEPLOY.md](./docs/DEPLOY.md)** and **[docs/RUNBOOK-demo.md](./docs/RUNBOOK-demo.md)**. Current live connector URL: `https://app.agentfirst.shop/mcp` (Developer mode, No Auth). Direct compute URL: `https://agent-shop-mcp-787adbc2-92c6-4b37-a0a9-3e8d94123584.fly.dev/mcp`.
 
 ## Repo map
 

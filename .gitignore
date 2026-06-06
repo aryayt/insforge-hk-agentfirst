@@ -70,3 +70,4 @@ fly.toml
 # mcp-use local widget/session output. Keep .mcp-use/tool-registry.d.ts tracked.
 apps/mcp/.mcp-use/*/
 apps/mcp/.mcp-use/sessions.json
+.vercel

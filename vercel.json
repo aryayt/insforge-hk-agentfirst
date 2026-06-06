@@ -4,6 +4,18 @@
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     {
+      "source": "/mcp",
+      "destination": "https://agent-shop-mcp-787adbc2-92c6-4b37-a0a9-3e8d94123584.fly.dev/mcp"
+    },
+    {
+      "source": "/mcp/:path*",
+      "destination": "https://agent-shop-mcp-787adbc2-92c6-4b37-a0a9-3e8d94123584.fly.dev/mcp/:path*"
+    },
+    {
+      "source": "/mcp-use/:path*",
+      "destination": "https://agent-shop-mcp-787adbc2-92c6-4b37-a0a9-3e8d94123584.fly.dev/mcp-use/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
