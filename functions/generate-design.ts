@@ -144,9 +144,15 @@ function openAiSize(aspectRatio: string): string {
   return w > h ? "1536x1024" : "1024x1536";
 }
 
-async function generateWithGemini(prompt: string): Promise<Uint8Array | null> {
+// Each generator reports *why* it produced nothing so the caller can tell a
+// content block (a user error — reword the prompt) apart from an infra failure
+// (bad key, model outage). `blocked` means the provider's safety system refused.
+type GenAttempt = { bytes: Uint8Array | null; blocked?: boolean; reason?: string };
+const SAFETY_FINISH = /SAFETY|PROHIBIT|BLOCK|SPII|RECITATION/i;
+
+async function generateWithGemini(prompt: string): Promise<GenAttempt> {
   const key = Deno.env.get("GOOGLE_AI_API_KEY");
-  if (!key) return null;
+  if (!key) return { bytes: null };
   const model = Deno.env.get("GOOGLE_IMAGE_MODEL") ?? "gemini-2.5-flash-image";
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -158,18 +164,28 @@ async function generateWithGemini(prompt: string): Promise<Uint8Array | null> {
   );
   if (!res.ok) {
     console.error("gemini error", res.status, (await res.text()).slice(0, 300));
-    return null;
+    return { bytes: null };
   }
   const out = await res.json();
-  const parts: Array<{ inlineData?: { data?: string } }> =
-    out?.candidates?.[0]?.content?.parts ?? [];
+  const candidate = out?.candidates?.[0];
+  const parts: Array<{ inlineData?: { data?: string } }> = candidate?.content?.parts ?? [];
   const b64 = parts.find((p) => p.inlineData?.data)?.inlineData?.data;
-  return b64 ? b64ToBytes(b64) : null;
+  if (b64) return { bytes: b64ToBytes(b64) };
+  // No image part: Gemini declines disallowed prompts by returning text (or a
+  // safety finishReason / promptFeedback block) instead of an image. Surface it.
+  const finishReason: string | undefined = candidate?.finishReason;
+  const blockReason: string | undefined = out?.promptFeedback?.blockReason;
+  if (blockReason || (finishReason && SAFETY_FINISH.test(finishReason))) {
+    console.error("gemini declined", finishReason ?? "", blockReason ?? "");
+    return { bytes: null, blocked: true, reason: `Gemini: ${blockReason ?? finishReason}` };
+  }
+  console.error("gemini no image", finishReason ?? "(none)");
+  return { bytes: null };
 }
 
-async function generateWithOpenAI(prompt: string, size: string): Promise<Uint8Array | null> {
+async function generateWithOpenAI(prompt: string, size: string): Promise<GenAttempt> {
   const key = Deno.env.get("OPENAI_API_KEY");
-  if (!key) return null;
+  if (!key) return { bytes: null };
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -181,12 +197,28 @@ async function generateWithOpenAI(prompt: string, size: string): Promise<Uint8Ar
     }),
   });
   if (!res.ok) {
-    console.error("openai error", res.status, (await res.text()).slice(0, 300));
-    return null;
+    const text = await res.text();
+    console.error("openai error", res.status, text.slice(0, 300));
+    let code: string | undefined;
+    let message: string | undefined;
+    try {
+      const parsed = JSON.parse(text);
+      code = parsed?.error?.code;
+      message = parsed?.error?.message;
+    } catch {
+      // non-JSON error body — fall through to a plain infra failure
+    }
+    if (
+      res.status === 400 &&
+      (code === "moderation_block" || /safety system|moderation/i.test(message ?? ""))
+    ) {
+      return { bytes: null, blocked: true, reason: "OpenAI safety system" };
+    }
+    return { bytes: null };
   }
   const out = await res.json();
   const b64 = out?.data?.[0]?.b64_json;
-  return b64 ? b64ToBytes(b64) : null;
+  return { bytes: b64 ? b64ToBytes(b64) : null };
 }
 
 export default async function (req: Request): Promise<Response> {
@@ -221,17 +253,34 @@ export default async function (req: Request): Promise<Response> {
     if (prompt.length > 2000) return json(400, { error: "prompt too long" });
 
     const verdict = await moderate(prompt);
-    if (!verdict.ok) return json(422, { error: verdict.reason, moderation: true });
+    if (!verdict.ok)
+      return json(422, { error: verdict.reason, message: verdict.reason, moderation: true });
 
     const shaped = buildPrompt(prompt, aspectRatio, transparent);
-    bytes =
-      (await generateWithGemini(shaped)) ??
-      (await generateWithOpenAI(shaped, openAiSize(aspectRatio)));
+    // Primary (Gemini) → fallback (OpenAI). Track whether *either* provider
+    // refused on safety grounds so we can report a content block distinctly.
+    const primary = await generateWithGemini(shaped);
+    let blocked = primary.blocked;
+    let blockReason = primary.reason;
+    bytes = primary.bytes;
     if (!bytes) {
-      return json(502, {
-        error:
-          "Image generation failed — check GOOGLE_AI_API_KEY / OPENAI_API_KEY secrets and function logs.",
-      });
+      const fallback = await generateWithOpenAI(shaped, openAiSize(aspectRatio));
+      bytes = fallback.bytes;
+      if (fallback.blocked) {
+        blocked = true;
+        blockReason = fallback.reason;
+      }
+    }
+    if (!bytes) {
+      if (blocked) {
+        const message =
+          "That prompt was blocked by the image safety system. Describe original artwork — " +
+          "no brand logos, copyrighted characters, real people, or violent/explicit content.";
+        return json(422, { error: message, message, moderation: true, reason: blockReason });
+      }
+      const message =
+        "Image generation failed — check GOOGLE_AI_API_KEY / OPENAI_API_KEY secrets and function logs.";
+      return json(502, { error: message, message });
     }
   } else {
     // upload / preset: caller supplies the bytes; we only persist them.
