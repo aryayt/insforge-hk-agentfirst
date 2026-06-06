@@ -32,7 +32,7 @@ The MCP server is the headline. Treat it as a product, not plumbing: tool names,
 - **Runtime/PM:** `bun` (>=1.3). Never `npm`/`npx`/`yarn`. Use `bunx` for one-off CLIs.
 - **Language:** TypeScript everywhere. ESM (`"type": "module"`).
 - **Backend:** InsForge only — do not stand up a parallel Postgres/Express. Use `@insforge/sdk` in app code and the `insforge` CLI for infra.
-- **MCP:** `@modelcontextprotocol/sdk` (TypeScript). Streamable HTTP transport (ChatGPT connects remotely).
+- **MCP:** `mcp-use` (hono-based server SDK + Apps SDK widget support). Streamable HTTP at `/mcp`; ChatGPT connects remotely. `createMCPServer(...).tool({...})`, `.uiResource({...})` for widgets, `.listen(port)`.
 - **Payments:** Stripe **test mode**, wired through InsForge `payments`. Never put live keys anywhere.
 - **Secrets:** app code reads `.env.local`; CLI reads `.insforge/project.json`. Both are gitignored. **Never hardcode or commit keys.** Add new vars to `.env.example` (no values).
 
@@ -45,6 +45,22 @@ packages/shared/ Shared zod schemas + TS types (catalog, design, order)
 functions/       InsForge edge functions (Stripe webhook, fulfillment)
 docs/            PRODUCT, ARCHITECTURE, BACKEND, BRANCHING, DECISIONS/
 ```
+
+## Run it
+
+```bash
+bun install
+bun run mcp:dev        # MCP server → http://localhost:8788/mcp  (health: /health, inspector: /inspector)
+bun run typecheck      # all workspaces
+```
+
+The MCP server reads InsForge creds from env (`INSFORGE_API_BASE_URL` + `INSFORGE_API_KEY`) and falls back to the linked `.insforge/project.json` for local dev. Run via the workspace scripts (`bun run mcp:dev`) so the cwd is `apps/mcp` — mcp-use resolves its widget toolchain from there.
+
+## Current state (2026-06-06)
+
+- **Backend (live):** 7 tables + RLS, `designs` storage bucket, catalog seeded (tee/mug/cap). See `docs/BACKEND.md`.
+- **MCP (working):** `list_products` + `get_product` wired to InsForge; `create_design`, `add_to_cart`, `get_cart`, `create_checkout` are annotated **stubs** — these are the open feature-branch tasks.
+- **Not yet:** Stripe payments config (needs test key), the web app (`apps/web`), AI design generation, Stripe webhook function, Fly deploy.
 
 ## Before you build (checklist)
 
