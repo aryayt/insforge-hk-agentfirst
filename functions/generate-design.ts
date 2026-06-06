@@ -94,8 +94,13 @@ async function moderate(prompt: string): Promise<{ ok: boolean; reason?: string 
 
 // ── Prompt shaping ────────────────────────────────────────────────────────────
 function buildPrompt(prompt: string, aspectRatio: string, transparent: boolean): string {
+  // NOTE: the primary model (Gemini) does not emit true alpha — if asked for a
+  // "transparent background" it paints a gray-and-white CHECKERBOARD. So we
+  // always ask for a flat, solid background (white) and remove it downstream
+  // (multiply blend on the garment + client-side white-key). Never mention
+  // transparency/alpha/sticker to the model.
   const bg = transparent
-    ? "Isolated subject on a fully transparent background (alpha channel), die-cut sticker style, no backdrop, no canvas, no frame."
+    ? "Place the subject centered on a plain, perfectly FLAT solid pure-white (#FFFFFF) background — a clean empty studio backdrop. Do NOT draw a transparency checkerboard, grid, squares, gradient, texture, or any pattern behind the subject; the background must be uniform solid white so it can be removed cleanly."
     : "Clean high-contrast artwork on a plain solid white background.";
   return (
     `Original, print-ready product artwork — no brand logos, no copyrighted characters, no watermark, no text. ` +
