@@ -10,6 +10,9 @@
   "engines": {
     "bun": ">=1.3.0"
   },
+  "dependencies": {
+    "@insforge/sdk": "latest"
+  },
   "scripts": {
     "mcp:dev": "bun --filter '@app/mcp' dev",
     "web:dev": "bun --filter '@app/web' dev",

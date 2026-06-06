@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "insforge-hk-agentfirst",
+      "dependencies": {
+        "@insforge/sdk": "latest",
+      },
     },
     "apps/mcp": {
       "name": "@app/mcp",

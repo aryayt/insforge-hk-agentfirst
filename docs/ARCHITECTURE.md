@@ -31,16 +31,18 @@
 - **`apps/mcp` — MCP server.** The ChatGPT-facing surface. Exposes the tools in `docs/PRODUCT.md`. Stateless request handlers; all state in InsForge. Auth: each MCP session carries an identity that maps to an InsForge user (carts/orders are per-user). Transport: Streamable HTTP so ChatGPT can connect remotely.
 - **`apps/web` — storefront / design studio / checkout.** Thin React app on `@insforge/sdk` for the visual side: preview a design, confirm a cart, complete Stripe checkout, basic admin.
 - **`packages/shared` — the contract.** Zod schemas + types for catalog, product variant/options, design spec, cart line item, order. Both surfaces import from here so they can't drift.
-- **`functions/` — InsForge edge functions.** Server-side logic that shouldn't live in a client: the **Stripe webhook handler** (payment → order state), design-generation orchestration if it needs secrets, and any fulfillment hand-off.
-- **InsForge backend.** Database (catalog, designs, carts, orders), Auth (user identity behind MCP + web), Storage (generated/uploaded design images — persist both `url` and `key`), AI gateway (design generation), Payments (Stripe products/prices mirror + webhooks).
+- **`functions/` — InsForge edge functions.** Server-side logic that shouldn't live in a client. Payment→paid is handled by InsForge's **managed** Stripe webhook + a SQL trigger (no hand-rolled webhook), so the functions here are the fulfillment outbox drainer **`fulfill-order`** (paid order → Printful via `@app/shared` provider) and **`printful-webhook`** (provider status → `orders.status`). Design-generation orchestration lands here too if it needs secrets.
+- **InsForge backend.** Database (catalog, designs, carts, orders, `fulfillment_jobs`), Auth (user identity behind MCP + web), Storage (generated/uploaded design images — persist both `url` and `key`), AI gateway (design generation), Payments (Stripe products/prices mirror + managed webhook → `payments.payment_history`).
+- **Printful — print-on-demand fulfillment.** Real provider behind a `FulfillmentProvider` interface (`packages/shared/src/fulfillment`); a mock fallback runs when no token is set. See ADR 0001 D1 (revisited).
 
 ## Key data flow: design → buy
 
 1. `create_design` → (AI gateway or upload) → image saved to Storage → `design` row (prompt, image url+key, placement).
 2. `customize_product` → resolves a `product` + `variant` + `design` into a priced line item.
 3. `add_to_cart` → `cart_item` rows for the user.
-4. `create_checkout` → InsForge payments creates a Stripe Checkout Session from mirrored prices → returns URL.
-5. User pays → Stripe webhook → `functions/stripe-webhook` → `order` marked `paid` → fulfillment.
+4. `create_checkout` → creates a trusted `pending` order (+ shipping address) → InsForge payments creates a Stripe Checkout Session from mirrored prices with `metadata.order_id` → returns URL.
+5. User pays → InsForge **managed** Stripe webhook updates `payments.payment_history` → SQL trigger marks the `order` `paid` and enqueues a `fulfillment_jobs` row.
+6. `fulfill-order` (scheduled) drains the outbox → submits to Printful (catalog `variant_id` + design image URL) → stores `provider_order_id`. `printful-webhook` later flips `orders.status` to `fulfilled`/`failed`. With no Printful token, the mock provider completes the order instead.
 
 ## Why InsForge does the heavy lifting
 

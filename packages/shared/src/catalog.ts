@@ -16,6 +16,11 @@ export const Variant = z.object({
   priceDeltaCents: z.number().int().default(0),
   /** Stripe price id once mirrored via `insforge payments`. */
   stripePriceId: z.string().nullable().default(null),
+  /**
+   * Printful CATALOG variant id (NOT product id) this SKU maps to. Null until mapped;
+   * a null mapping means Printful can't fulfill this variant. See packages/shared/src/fulfillment.
+   */
+  printfulVariantId: z.number().int().nullable().default(null),
 });
 export type Variant = z.infer<typeof Variant>;
 
