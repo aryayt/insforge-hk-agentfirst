@@ -46,6 +46,34 @@ function b64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+// ── Caller identity ────────────────────────────────────────────────────────────
+// The SDK forwards the caller's bearer token on functions.invoke(): a signed-in
+// web user sends their access token, a guest sends the anon key, and the MCP
+// server sends the admin API key. We validate the token against the backend so
+// the design is owned by the real user — and fall back to null (guest) for the
+// anon/admin keys, an absent/invalid token, or any auth hiccup. The row itself
+// is still written by the admin client below; this only decides ownership.
+async function resolveUserId(req: Request): Promise<string | null> {
+  const authz = req.headers.get("Authorization") ?? req.headers.get("authorization");
+  if (!authz) return null;
+  const token = authz.replace(/^Bearer\s+/i, "").trim();
+  const anon = Deno.env.get("ANON_KEY");
+  // Guests/agents send the anon key or the admin API key, not a user session.
+  if (!token || token === anon || token === Deno.env.get("API_KEY")) return null;
+  try {
+    const base = Deno.env.get("INSFORGE_BASE_URL");
+    const res = await fetch(`${base}/api/auth/sessions/current`, {
+      headers: { Authorization: `Bearer ${token}`, ...(anon ? { apikey: anon } : {}) },
+    });
+    if (!res.ok) return null; // expired/invalid token → treat as guest
+    const body = await res.json();
+    return body?.user?.id ?? null;
+  } catch (e) {
+    console.error("resolveUserId failed", e);
+    return null;
+  }
+}
+
 // ── Moderation ───────────────────────────────────────────────────────────────
 // A print shop is liable for what it prints. A cheap local blocklist catches the
 // obviously-disallowed; when an OpenAI key is present we also run the prompt
@@ -221,7 +249,8 @@ export default async function (req: Request): Promise<Response> {
     apiKey: Deno.env.get("API_KEY"),
   });
 
-  const key = `guest/${crypto.randomUUID()}.png`;
+  const userId = await resolveUserId(req);
+  const key = `${userId ? `users/${userId}` : "guest"}/${crypto.randomUUID()}.png`;
   const file = new File([bytes], key.split("/").pop()!, { type: "image/png" });
   const { data: up, error: upErr } = await admin.storage.from("designs").upload(key, file);
   if (upErr || !up?.url || !up?.key) {
@@ -234,7 +263,7 @@ export default async function (req: Request): Promise<Response> {
     .from("designs")
     .insert([
       {
-        user_id: null,
+        user_id: userId,
         source,
         prompt: prompt ?? null,
         image_url: up.url,

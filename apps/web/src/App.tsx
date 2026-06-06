@@ -15,6 +15,9 @@ import {
   type Placement,
 } from "./components/ShirtPreview";
 import { PrintReadyPanel } from "./components/PrintReadyPanel";
+import { PrintfulMockupCard } from "./components/MockupCompare";
+import { ProductInfoPanel } from "./components/ProductInfoPanel";
+import { PRINTFUL_PRODUCT_BY_SLUG } from "./lib/mockup";
 import { AccountControl } from "./components/AccountControl";
 import { useAuth } from "./lib/auth";
 
@@ -292,6 +295,16 @@ export function App() {
               </div>
             </div>
           )}
+
+          {/* Photoreal Printful mockup — beside the instant local preview above */}
+          <div className="mt-4">
+            <PrintfulMockupCard
+              artworkUrl={displayUrl}
+              printfulVariantId={variant?.printfulVariantId ?? null}
+              color={shirtColor === "white" ? "White" : "Black"}
+              size={size}
+            />
+          </div>
         </section>
 
         {/* ── Studio panel ──────────────────────────────────────────── */}
@@ -502,6 +515,17 @@ export function App() {
                 </div>
               </div>
             </div>
+          </Card>
+
+          {/* Product info: print specs, live sizes/colors, price breakdown */}
+          <Card>
+            <ProductInfoPanel
+              printArea={printArea}
+              printfulProductId={PRINTFUL_PRODUCT_BY_SLUG["classic-tee"] ?? null}
+              retailCents={unitPriceCents}
+              color={shirtColor === "white" ? "White" : "Black"}
+              size={size}
+            />
           </Card>
 
           {/* Checkout */}

@@ -38,7 +38,9 @@ RLS: users see only their own `designs`, `carts`, `cart_items`, `orders`. `produ
 ## Edge functions
 
 - `stripe-webhook` — verify signature, mark `orders.status`, trigger fulfillment. Stripe → InsForge-managed webhook (see `insforge payments webhooks`).
-- (maybe) `generate-design` — server-side AI-gateway call if generation needs secret keys.
+- `generate-design` — server-side AI image generation; uploads to the `designs` bucket + inserts a row.
+- `printful-mockup` — renders a design on the real product via Printful's Mockup Generator (create-task → poll). Powers the studio's photoreal preview (the `printful` MockupRenderer). Secret: `PRINTFUL_API_KEY`.
+- `printful-catalog` — live Printful product info (sizes/colors + per-variant cost) for the studio's info panel + price breakdown.
 
 ## Payments (Stripe, test mode)
 

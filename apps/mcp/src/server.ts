@@ -4,11 +4,17 @@ import { getProduct, getVariantBySku, listProducts } from "./catalog";
 import { createDesign, getDesign } from "./design";
 import { addLine, cartTotalCents, clearCart, getCart } from "./cart";
 import { anon } from "./insforge";
+import {
+  printfulFromEnv,
+  resolvePrintfulVariant,
+  type OrderItem,
+  type OrderRecipient,
+} from "./printful";
 
 const server = createMCPServer("agent-shop", {
   version: "0.1.0",
   description:
-    "Shop for and design custom t-shirts, mugs, and caps — and check out with Stripe — without leaving the chat.",
+    "Shop for and design custom t-shirts, mugs, and caps, then place a real print-on-demand order (fulfilled by Printful) — all without leaving the chat.",
 });
 
 const money = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
@@ -300,6 +306,149 @@ server.tool({
       ],
       structuredContent: { url, amountCents: cartTotalCents(cart) },
     };
+  },
+});
+
+// ── place_order ───────────────────────────────────────────────────────────────
+// Real fulfillment: sends the cart + the design artwork to Printful and (by
+// default) CONFIRMS it — which charges the connected Printful account and starts
+// production. This is the "pay on the spot" step; there is no Printful sandbox, so
+// confirm:true spends real money. destructiveHint makes hosts surface a consent
+// prompt before the model runs it.
+server.tool({
+  name: "place_order",
+  description:
+    "Place a REAL print-on-demand order with Printful for everything in a cart, printing each item's design, and ship it to the given address. By default this CONFIRMS the order, which CHARGES the connected Printful account immediately (real money) and starts production. Pass confirm:false to create an unconfirmed draft (priced, not charged) to preview cost first. Requires every cart item to have a design.",
+  inputs: [
+    { name: "cartId", type: "string", description: "Cart id from add_to_cart.", required: true },
+    { name: "name", type: "string", description: "Recipient full name.", required: true },
+    { name: "address1", type: "string", description: "Street address line 1.", required: true },
+    { name: "city", type: "string", description: "City.", required: true },
+    { name: "country_code", type: "string", description: "ISO country code, e.g. US, GB, DE.", required: true },
+    { name: "zip", type: "string", description: "ZIP / postal code.", required: true },
+    { name: "state_code", type: "string", description: "State/province code (required for US/CA/AU), e.g. CA.", required: false },
+    { name: "address2", type: "string", description: "Street address line 2 (apt, suite).", required: false },
+    { name: "email", type: "string", description: "Recipient email for shipping updates.", required: false },
+    { name: "phone", type: "string", description: "Recipient phone (some carriers require it).", required: false },
+    {
+      name: "confirm",
+      type: "boolean",
+      description:
+        "true (default) = confirm now and CHARGE the Printful account (real money). false = create an unconfirmed draft to preview cost without charging.",
+      required: false,
+    },
+  ],
+  annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: true },
+  cb: async (args: {
+    cartId: string;
+    name: string;
+    address1: string;
+    city: string;
+    country_code: string;
+    zip: string;
+    state_code?: string;
+    address2?: string;
+    email?: string;
+    phone?: string;
+    confirm?: boolean;
+  }) => {
+    const client = printfulFromEnv();
+    if (!client) {
+      return text(
+        "Fulfillment is unavailable: set PRINTFUL_API_KEY in .env.local so the server can place Printful orders.",
+      );
+    }
+
+    const cart = getCart(args.cartId);
+    if (!cart || cart.lines.length === 0) return text("That cart is empty — add items before ordering.");
+
+    // Resolve every line to a Printful order item (variant + print file). Any line
+    // without a design, or a product/colour we don't map to Printful, fails clearly.
+    const items: OrderItem[] = [];
+    for (const line of cart.lines) {
+      if (!line.designPreviewUrl) {
+        return text(`"${line.label}" has no design — only printed items can be fulfilled. Add one with create_design.`);
+      }
+      if (line.designPreviewUrl.startsWith("data:")) {
+        return text(`"${line.label}" has a non-public design URL; Printful needs an https URL it can fetch.`);
+      }
+      const resolved = await getVariantBySku(line.sku);
+      if (!resolved) return text(`Couldn't resolve SKU "${line.sku}".`);
+      try {
+        const { variantId, placement } = resolvePrintfulVariant(
+          resolved.product.type,
+          resolved.variant.color.toLowerCase(),
+          resolved.variant.size,
+        );
+        items.push({
+          variant_id: variantId,
+          quantity: line.qty,
+          files: [{ type: placement, url: line.designPreviewUrl }],
+        });
+      } catch (e) {
+        return text(`Can't fulfill "${line.label}": ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    const recipient: OrderRecipient = {
+      name: args.name,
+      address1: args.address1,
+      city: args.city,
+      country_code: args.country_code,
+      zip: args.zip,
+      ...(args.state_code ? { state_code: args.state_code } : {}),
+      ...(args.address2 ? { address2: args.address2 } : {}),
+      ...(args.email ? { email: args.email } : {}),
+      ...(args.phone ? { phone: args.phone } : {}),
+    };
+
+    const willCharge = args.confirm !== false; // default true (real charge)
+    try {
+      // Always create a draft first so we have an inspectable order + Printful's
+      // own cost breakdown, then confirm (the actual charge) only when asked.
+      const draft = await client.createOrder({ recipient, items }, { confirm: false });
+      const c = draft.costs;
+      const shipTo = `${recipient.name}, ${recipient.address1}, ${recipient.city} ${recipient.zip} ${recipient.country_code}`;
+
+      if (!willCharge) {
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                `Draft order #${draft.id} created — NOT charged.\n` +
+                `Printful cost: ${c.total} ${c.currency} (subtotal ${c.subtotal} + shipping ${c.shipping} + tax ${c.tax}).\n` +
+                `Ships to: ${shipTo}\n\n` +
+                `To pay & start production (REAL charge), call place_order again with confirm:true.`,
+            },
+          ],
+          structuredContent: { orderId: draft.id, status: draft.status, confirmed: false, costs: c },
+        };
+      }
+
+      const final = await client.confirmOrder(draft.id);
+      clearCart(cart.id);
+      const fc = final.costs;
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              `✅ Order #${final.id} placed and CHARGED to the Printful account (status: ${final.status}).\n` +
+              `Paid: ${fc.total} ${fc.currency} (subtotal ${fc.subtotal} + shipping ${fc.shipping} + tax ${fc.tax}).\n` +
+              `Ships to: ${shipTo}\n` +
+              `Track status later with the Printful order id ${final.id}.`,
+          },
+        ],
+        structuredContent: { orderId: final.id, status: final.status, confirmed: true, costs: fc },
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return text(
+        `Couldn't place the order: ${msg}\n` +
+          `(A real charge requires a billing method / wallet balance on the Printful account.)`,
+      );
+    }
   },
 });
 

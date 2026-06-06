@@ -1,6 +1,6 @@
 // Auto-generated tool registry types - DO NOT EDIT MANUALLY
 // This file is regenerated whenever tools are added, removed, or updated during development
-// Generated at: 2026-06-06T18:12:17.946Z
+// Generated at: 2026-06-06T21:26:44.820Z
 
 declare module "mcp-use/react" {
   interface ToolRegistry {
@@ -25,6 +25,10 @@ declare module "mcp-use/react" {
       output: Record<string, unknown>;
     };
     "list_products": {
+      input: null;
+      output: Record<string, unknown>;
+    };
+    "place_order": {
       input: null;
       output: Record<string, unknown>;
     };
