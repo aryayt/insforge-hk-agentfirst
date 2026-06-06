@@ -83,3 +83,41 @@ export async function getProduct(slug: string): Promise<Product | null> {
 
   return toProduct(row, variants as VariantRow[]);
 }
+
+export type ResolvedVariant = {
+  product: Product;
+  variant: Variant;
+  /** base price + this variant's delta. */
+  unitPriceCents: number;
+  /** e.g. "Classic Tee — White / M". */
+  label: string;
+};
+
+/** Resolve a SKU to its variant + parent product + price snapshot (for the cart). */
+export async function getVariantBySku(sku: string): Promise<ResolvedVariant | null> {
+  const { data: variants, error: vErr } = await admin.database
+    .from("variants")
+    .select()
+    .eq("sku", sku)
+    .limit(1);
+  if (vErr) throw vErr;
+
+  const vRow = (variants as VariantRow[])[0];
+  if (!vRow) return null;
+
+  const { data: products, error: pErr } = await admin.database
+    .from("products")
+    .select()
+    .eq("id", vRow.product_id)
+    .limit(1);
+  if (pErr) throw pErr;
+
+  const pRow = (products as ProductRow[])[0];
+  if (!pRow) return null;
+
+  const product = toProduct(pRow, [vRow]);
+  const variant = product.variants[0]!;
+  const unitPriceCents = product.basePriceCents + (variant.priceDeltaCents ?? 0);
+  const label = `${product.name} — ${variant.color}${variant.size ? ` / ${variant.size}` : ""}`;
+  return { product, variant, unitPriceCents, label };
+}

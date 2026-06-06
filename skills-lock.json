@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "chatgpt-app-builder": {
+      "source": "mcp-use/mcp-use",
+      "sourceType": "github",
+      "skillPath": "skills/chatgpt-app-builder/SKILL.md",
+      "computedHash": "88cb5525f005394605143d9b72d1ad8f3e304ac09f10ed2247429a8e0bdb2378"
+    },
     "mcp-apps-builder": {
       "source": "mcp-use/mcp-use",
       "sourceType": "github",

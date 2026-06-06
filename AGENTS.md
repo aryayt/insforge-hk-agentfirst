@@ -58,9 +58,11 @@ The MCP server reads InsForge creds from env (`INSFORGE_API_BASE_URL` + `INSFORG
 
 ## Current state (2026-06-06)
 
-- **Backend (live):** 7 tables + RLS, `designs` storage bucket, catalog seeded (tee/mug/cap). See `docs/BACKEND.md`.
-- **MCP (working):** `list_products` + `get_product` wired to InsForge; `create_design`, `add_to_cart`, `get_cart`, `create_checkout` are annotated **stubs** — these are the open feature-branch tasks.
-- **Not yet:** Stripe payments config (needs test key), the web app (`apps/web`), AI design generation, Stripe webhook function, Fly deploy.
+- **Backend (live):** 7 tables + RLS, guest+agent commerce model (`designs`/`orders`/`order_items` allow `user_id = null`, with provenance + denormalized label columns — see `migrations/20260606190000_guest-agent-commerce.sql`), `designs` storage bucket (public), catalog seeded with Stripe test prices on every variant.
+- **AI design (live):** `generate-design` edge function — moderates the prompt, generates transparent print-ready art at the product's aspect ratio (Gemini → OpenAI fallback), uploads to Storage, inserts a guest `designs` row. Model keys are InsForge secrets. Supports `source: upload` for user art too. It is the single source of truth for design creation — both surfaces call it.
+- **Web (working):** `apps/web` design studio generates via the edge function, persists the design, and carries `design_id` + the short `design_preview_url` into Stripe checkout (anon client).
+- **MCP (working):** all tools wired — `list_products`, `get_product`, `create_design` (→ edge function), `add_to_cart`/`get_cart` (per-conversation session cart), `create_checkout` (Stripe test via the anon-key client; design + agent provenance in metadata).
+- **Not yet:** Stripe webhook → order-row fulfillment (orders schema is ready; checkout metadata carries everything a webhook needs), authenticated (non-guest) flows, Fly deploy, realistic garment mockup, design variations.
 
 ## Before you build (checklist)
 
