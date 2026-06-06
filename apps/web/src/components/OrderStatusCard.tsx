@@ -27,21 +27,32 @@ export function OrderStatusCard({ orderId }: { orderId: string }) {
   const [amountCents, setAmountCents] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  // Load + poll for ~30s so the status flips from pending→paid as the webhook lands.
+  // Poll until the order is readable AND settled. We keep retrying on a null read too:
+  // right after the Stripe redirect the page reloads and auth rehydrates asynchronously,
+  // so the first read can race ahead of the session token (RLS → 0 rows). Also poll
+  // while still 'pending' so it flips to 'paid' as the webhook + trigger land.
   useEffect(() => {
     let cancelled = false;
     let tries = 0;
     const tick = async () => {
       try {
         const o = await fetchOrder(orderId);
-        if (cancelled || !o) return;
-        setStatus(o.status);
-        setAmountCents(o.amountCents);
-        if (o.status === "pending" && tries++ < 15) setTimeout(tick, 2000);
+        if (cancelled) return;
+        if (o) {
+          setStatus(o.status);
+          setAmountCents(o.amountCents);
+          setLoadErr(null);
+          if (o.status === "pending" && tries++ < 25) setTimeout(tick, 2000);
+          return;
+        }
       } catch {
-        /* ignore transient read errors */
+        /* transient — fall through to retry */
       }
+      if (cancelled) return;
+      if (tries++ < 25) setTimeout(tick, 1500);
+      else setLoadErr("Couldn't load this order — make sure you're signed in, then refresh.");
     };
     tick();
     return () => {
@@ -67,8 +78,8 @@ export function OrderStatusCard({ orderId }: { orderId: string }) {
     <div className="mx-auto mt-4 max-w-6xl px-6">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status ? TONE[status] : "bg-zinc-100 text-zinc-500"}`}>
-            {status ? LABEL[status] : "Loading order…"}
+          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status ? TONE[status] : loadErr ? "bg-red-100 text-red-700" : "bg-zinc-100 text-zinc-500"}`}>
+            {status ? LABEL[status] : loadErr ? "Couldn't load" : "Loading order…"}
           </span>
           <span className="text-sm text-zinc-500">
             Order <span className="font-mono text-zinc-700">{orderId.slice(0, 8)}</span>
@@ -76,7 +87,7 @@ export function OrderStatusCard({ orderId }: { orderId: string }) {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          {err && <span className="text-xs text-red-500">{err}</span>}
+          {(err || loadErr) && <span className="text-xs text-red-500">{err || loadErr}</span>}
           {cancelable && (
             <button
               onClick={onCancel}
