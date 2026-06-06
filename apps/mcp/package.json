@@ -5,20 +5,28 @@
   "type": "module",
   "main": "src/server.ts",
   "scripts": {
-    "dev": "bun --watch src/server.ts",
-    "start": "bun src/server.ts",
+    "build": "bun run prepare:mcp-use && mcp-use build",
+    "dev": "bun run prepare:mcp-use && mcp-use dev",
+    "postinstall": "bun run prepare:mcp-use && mcp-use generate-types || exit 0",
+    "prepare:mcp-use": "node scripts/prepare-mcp-use.mjs",
+    "start": "bun run prepare:mcp-use && mcp-use start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@app/shared": "workspace:*",
     "@insforge/sdk": "latest",
     "mcp-use": "latest",
-    "zod": "^3.23.8"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "latest",
     "@types/node": "latest",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "latest",
+    "tailwindcss": "^4.1.12",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.3",
     "vite": "latest"
   }

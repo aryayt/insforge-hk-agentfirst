@@ -1,4 +1,4 @@
-import { createMCPServer } from "mcp-use/server";
+import { createMCPServer, widget } from "mcp-use/server";
 import { aspectRatioForProduct, type ProductType } from "@app/shared";
 import { getProduct, getVariantBySku, listProducts } from "./catalog";
 import { createDesign, getDesign } from "./design";
@@ -18,6 +18,21 @@ const server = createMCPServer("agent-shop", {
 });
 
 const money = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
+const productUrl = (slug: string): string => `${WEB_URL.replace(/\/$/, "")}/products/${slug}`;
+
+type SearchResult = {
+  id: string;
+  title: string;
+  url: string;
+};
+
+type FetchResult = {
+  id: string;
+  title: string;
+  text: string;
+  url: string;
+  metadata?: Record<string, string>;
+};
 
 // Where Stripe sends the buyer after checkout. The agent surface has no browser
 // origin, so these are configurable; default to the web studio.
@@ -25,11 +40,130 @@ const WEB_URL = process.env.WEB_APP_URL ?? "http://localhost:5173";
 const SUCCESS_URL = process.env.CHECKOUT_SUCCESS_URL ?? `${WEB_URL}/?checkout=success`;
 const CANCEL_URL = process.env.CHECKOUT_CANCEL_URL ?? `${WEB_URL}/?checkout=canceled`;
 
+// ── search / fetch compatibility tools (ChatGPT app import) ────────────────
+// ChatGPT's current app import flow expects the compatibility `search` and
+// `fetch` read-only tools for data retrieval. We expose the catalog through
+// this shape while keeping the richer commerce tools below.
+server.tool({
+  name: "search",
+  description:
+    "Search the commerce catalog for products relevant to a query. Use this for broad discovery before calling product-specific commerce tools.",
+  inputs: [
+    {
+      name: "query",
+      type: "string",
+      description: "Search query, e.g. mug, black tee, hat, minimalist gift.",
+      required: true,
+    },
+  ],
+  annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
+  cb: async ({ query }: { query: string }) => {
+    const products = await listProducts();
+    const terms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((term) => term.trim())
+      .filter(Boolean);
+
+    const scored = products
+      .map((product) => {
+        const haystack = [
+          product.slug,
+          product.name,
+          product.type,
+          product.description,
+          ...product.variants.map((variant) => variant.color),
+          ...product.variants.map((variant) => variant.size ?? ""),
+          ...product.variants.map((variant) => variant.sku),
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        const score = terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
+        return { product, score };
+      })
+      .filter(({ score }) => terms.length === 0 || score > 0)
+      .sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name))
+      .slice(0, 8);
+
+    const results: SearchResult[] = scored.map(({ product }) => ({
+      id: product.slug,
+      title: product.name,
+      url: productUrl(product.slug),
+    }));
+
+    return {
+      content: [{ type: "text", text: JSON.stringify({ results }) }],
+      structuredContent: { results },
+    };
+  },
+});
+
+server.tool({
+  name: "fetch",
+  description:
+    "Fetch the full details for a catalog item returned by search. Use the returned id, which maps to a product slug.",
+  inputs: [
+    {
+      name: "id",
+      type: "string",
+      description: "Catalog item id from search results (currently the product slug).",
+      required: true,
+    },
+  ],
+  annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
+  cb: async ({ id }: { id: string }) => {
+    const product = await getProduct(id);
+    if (!product) {
+      return {
+        content: [{ type: "text", text: `No catalog item with id "${id}".` }],
+      };
+    }
+
+    const textBody = [
+      `${product.name} (${product.slug})`,
+      product.description,
+      `Type: ${product.type}`,
+      `Base price: ${money(product.basePriceCents)}`,
+      `Variants: ${product.variants
+        .map(
+          (variant) =>
+            `${variant.color}${variant.size ? ` / ${variant.size}` : ""} [${variant.sku}]${
+              variant.priceDeltaCents ? ` +${money(variant.priceDeltaCents)}` : ""
+            }`,
+        )
+        .join("; ")}`,
+    ].join("\n");
+
+    const result: FetchResult = {
+      id: product.slug,
+      title: product.name,
+      text: textBody,
+      url: productUrl(product.slug),
+      metadata: {
+        type: product.type,
+        variant_count: String(product.variants.length),
+      },
+    };
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(result) }],
+      structuredContent: result,
+    };
+  },
+});
+
 // ── list_products (read-only) ──────────────────────────────────────────────
 server.tool({
   name: "list_products",
   description:
     "List products available to buy and customize (t-shirts, mugs, caps), with base prices and variant counts.",
+  widget: {
+    name: "storefront",
+    invoking: "Opening the storefront...",
+    invoked: "Storefront ready",
+    widgetAccessible: false,
+  },
   inputs: [],
   annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   cb: async () => {
@@ -38,17 +172,19 @@ server.tool({
       (p) =>
         `• ${p.name} (${p.slug}) — from ${money(p.basePriceCents)} · ${p.variants.length} variants`,
     );
-    return {
-      content: [
-        {
-          type: "text",
-          text: products.length
-            ? `Available products:\n${lines.join("\n")}`
-            : "No products available.",
-        },
-      ],
-      structuredContent: { products },
-    };
+    return widget({
+      props: { products },
+      output: {
+        content: [
+          {
+            type: "text",
+            text: products.length
+              ? `Available products:\n${lines.join("\n")}`
+              : "No products available.",
+          },
+        ],
+      },
+    });
   },
 });
 
@@ -57,6 +193,12 @@ server.tool({
   name: "get_product",
   description:
     "Get full details for one product by slug (e.g. classic-tee, ceramic-mug, dad-cap): description, base price, and all color/size variants.",
+  widget: {
+    name: "product-detail",
+    invoking: "Loading product details...",
+    invoked: "Product details ready",
+    widgetAccessible: false,
+  },
   inputs: [
     {
       name: "slug",
@@ -77,15 +219,17 @@ server.tool({
           v.priceDeltaCents ? ` +${money(v.priceDeltaCents)}` : ""
         }`,
     );
-    return {
-      content: [
-        {
-          type: "text",
-          text: `${product.name} — ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
-        },
-      ],
-      structuredContent: { product },
-    };
+    return widget({
+      props: { product },
+      output: {
+        content: [
+          {
+            type: "text",
+            text: `${product.name} — ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
+          },
+        ],
+      },
+    });
   },
 });
 
@@ -96,6 +240,12 @@ server.tool({
   name: "create_design",
   description:
     "Generate print-ready artwork from a text prompt and save it as a design. Returns a design id (pass it to add_to_cart) and a preview image URL. Artwork is generated on a transparent background, sized for the chosen product's print area.",
+  widget: {
+    name: "design-preview",
+    invoking: "Generating artwork...",
+    invoked: "Design preview ready",
+    widgetAccessible: false,
+  },
   inputs: [
     {
       name: "prompt",
@@ -143,15 +293,17 @@ server.tool({
         label,
         sessionKey,
       });
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Created design "${design.label}" (id: ${design.id}). Preview: ${design.imageUrl}\nAdd it to a product with add_to_cart(sku, designId: "${design.id}").`,
-          },
-        ],
-        structuredContent: { design },
-      };
+      return widget({
+        props: { design },
+        output: {
+          content: [
+            {
+              type: "text",
+              text: `Created design "${design.label}" (id: ${design.id}). Preview: ${design.imageUrl}\nAdd it to a product with add_to_cart(sku, designId: "${design.id}").`,
+            },
+          ],
+        },
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "design generation failed";
       return text(`Couldn't create that design: ${msg}`);
@@ -164,6 +316,12 @@ server.tool({
   name: "add_to_cart",
   description:
     "Add a product variant (optionally printed with a design) to the cart. Returns a cartId — pass it to add_to_cart again, get_cart, and create_checkout.",
+  widget: {
+    name: "cart-summary",
+    invoking: "Refreshing cart...",
+    invoked: "Cart ready",
+    widgetAccessible: false,
+  },
   inputs: [
     { name: "sku", type: "string", description: "Variant SKU (from list_products / get_product).", required: true },
     { name: "designId", type: "string", description: "Optional design id from create_design.", required: false },
@@ -210,15 +368,18 @@ server.tool({
       (l) =>
         `• ${l.qty}× ${l.label}${l.designLabel ? ` + design "${l.designLabel}"` : ""} — ${money(l.unitPriceCents * l.qty)}`,
     );
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Added ${quantity}× ${resolved.label}${designLabel ? ` with design "${designLabel}"` : ""}.\n\nCart (id: ${cart.id}):\n${lines.join("\n")}\nTotal: ${money(cartTotalCents(cart))}`,
-        },
-      ],
-      structuredContent: { cartId: cart.id, cart },
-    };
+    const totalCents = cartTotalCents(cart);
+    return widget({
+      props: { cartId: cart.id, cart, totalCents },
+      output: {
+        content: [
+          {
+            type: "text",
+            text: `Added ${quantity}× ${resolved.label}${designLabel ? ` with design "${designLabel}"` : ""}.\n\nCart (id: ${cart.id}):\n${lines.join("\n")}\nTotal: ${money(totalCents)}`,
+          },
+        ],
+      },
+    });
   },
 });
 
@@ -226,6 +387,12 @@ server.tool({
 server.tool({
   name: "get_cart",
   description: "Show a cart's contents and total.",
+  widget: {
+    name: "cart-summary",
+    invoking: "Refreshing cart...",
+    invoked: "Cart ready",
+    widgetAccessible: false,
+  },
   inputs: [{ name: "cartId", type: "string", description: "Cart id from add_to_cart.", required: true }],
   annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   cb: async ({ cartId }: { cartId: string }) => {
@@ -235,12 +402,15 @@ server.tool({
       (l) =>
         `• ${l.qty}× ${l.label}${l.designLabel ? ` + design "${l.designLabel}"` : ""} — ${money(l.unitPriceCents * l.qty)}`,
     );
-    return {
-      content: [
-        { type: "text", text: `Cart (id: ${cart.id}):\n${lines.join("\n")}\nTotal: ${money(cartTotalCents(cart))}` },
-      ],
-      structuredContent: { cart },
-    };
+    const totalCents = cartTotalCents(cart);
+    return widget({
+      props: { cartId: cart.id, cart, totalCents },
+      output: {
+        content: [
+          { type: "text", text: `Cart (id: ${cart.id}):\n${lines.join("\n")}\nTotal: ${money(totalCents)}` },
+        ],
+      },
+    });
   },
 });
 
