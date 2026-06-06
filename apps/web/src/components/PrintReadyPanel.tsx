@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { printAreaPixelSize, type PrintArea } from "@app/shared";
+import { DEFAULT_PLACEMENT, type Placement } from "./ShirtPreview";
 
 type Props = {
   imageUrl: string | null;
   printArea: PrintArea;
   text?: string;
   textColor?: string;
+  /** Same placement the preview uses, so the print file matches what's shown. */
+  placement?: Placement;
 };
 
 type State =
@@ -35,11 +38,18 @@ function drawText(
  * a transparent background at the provider's physical box size and dpi —
  * exactly what the professional drops into their fixed print box. Downloadable.
  */
-export function PrintReadyPanel({ imageUrl, printArea, text, textColor = "#111827" }: Props) {
+export function PrintReadyPanel({
+  imageUrl,
+  printArea,
+  text,
+  textColor = "#111827",
+  placement = DEFAULT_PLACEMENT,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<State>({ kind: "idle" });
   const { width, height } = printAreaPixelSize(printArea);
   const label = text?.trim() ?? "";
+  const { x: px, y: py, scale: pscale } = placement;
 
   useEffect(() => {
     const hasImage = !!imageUrl;
@@ -61,10 +71,11 @@ export function PrintReadyPanel({ imageUrl, printArea, text, textColor = "#11182
       ctx.clearRect(0, 0, width, height);
 
       if (img) {
-        const scale = Math.min(width / img.width, height / img.height);
-        const w = img.width * scale;
-        const h = img.height * scale;
-        ctx.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
+        // Match the preview: contain-fit, then the user's scale, centred at (px,py).
+        const fit = Math.min(width / img.width, height / img.height) * pscale;
+        const w = img.width * fit;
+        const h = img.height * fit;
+        ctx.drawImage(img, px * width - w / 2, py * height - h / 2, w, h);
       }
       if (hasText) drawText(ctx, label, textColor, width, height, hasImage);
 
@@ -93,7 +104,7 @@ export function PrintReadyPanel({ imageUrl, printArea, text, textColor = "#11182
     return () => {
       cancelled = true;
     };
-  }, [imageUrl, label, textColor, width, height]);
+  }, [imageUrl, label, textColor, width, height, px, py, pscale]);
 
   return (
     <div className="space-y-3">

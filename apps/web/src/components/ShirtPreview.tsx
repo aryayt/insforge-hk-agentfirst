@@ -1,31 +1,31 @@
+import { useRef } from "react";
 import type { PrintArea } from "@app/shared";
 
 export type ShirtColor = "white" | "black";
+
+/** Where/how big the art sits inside the print box. x/y are the art's CENTRE as
+ *  a fraction of the box (0.5,0.5 = centred); scale is the fraction of the box it
+ *  fills (1 = contain-fit). Anything outside the box is clipped. */
+export type Placement = { x: number; y: number; scale: number };
+export const DEFAULT_PLACEMENT: Placement = { x: 0.5, y: 0.5, scale: 1 };
 
 type Props = {
   imageUrl: string | null;
   shirtColor: ShirtColor;
   printArea: PrintArea;
-  /** Optional text printed on the design. */
   text?: string;
   textColor?: string;
-  /** Draw the (subtle) printable-area guide. */
   showGuide?: boolean;
+  placement?: Placement;
+  /** When provided, the art can be dragged to reposition within the box. */
+  onPlacementChange?: (p: Placement) => void;
 };
 
 /**
- * Photoreal product preview: a real blank-tee photo (ghost mannequin, generated
- * once and committed under `public/mockups/`) with the artwork composited into
- * the chest print area. On a white tee the art is blended with `multiply` so it
- * reads as ink sitting in the fabric (and any white background drops out); on a
- * dark tee the transparent art is laid over normally.
- *
- * This is the in-browser `local` MockupRenderer (see packages/shared/src/mockup.ts):
- * instant and fully under our control. The print-ready file (PrintReadyPanel)
- * stays the physically-accurate artifact; this just looks like the real thing.
- *
- * Chest box is normalized over the square (1024×1024) mockup; its aspect tracks
- * the physical print box (widthCm:heightCm) so the placement stays faithful.
+ * Photoreal product preview: a real blank-tee photo with the artwork composited
+ * into the chest print box. The box clips overflow, so the art can be scaled and
+ * dragged but never prints outside the printable area. White tee uses `multiply`
+ * (ink in fabric); dark tee lays the transparent art over normally.
  */
 const CHEST = { x: 0.355, y: 0.30, width: 0.29 } as const;
 
@@ -36,21 +36,44 @@ export function ShirtPreview({
   text,
   textColor = "#111827",
   showGuide = true,
+  placement = DEFAULT_PLACEMENT,
+  onPlacementChange,
 }: Props) {
-  const boxAspect = printArea.heightCm / printArea.widthCm; // 40/30 = 1.333 for the tee
+  const boxRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+
+  const boxAspect = printArea.heightCm / printArea.widthCm;
   const box = {
     left: `${CHEST.x * 100}%`,
     top: `${CHEST.y * 100}%`,
     width: `${CHEST.width * 100}%`,
-    // height as a % of width keeps the box aspect = the physical print box.
     height: `${CHEST.width * boxAspect * 100}%`,
   };
 
-  const label = text?.trim();
   const onDark = shirtColor === "black";
-  // White tee: multiply so ink integrates with fabric + white bg disappears.
-  // Dark tee: normal, so the transparent artwork keeps its true colors.
   const artBlend = onDark ? "normal" : "multiply";
+  const label = text?.trim();
+  const draggable = !!imageUrl && !!onPlacementChange;
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (!draggable) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = { px: e.clientX, py: e.clientY, x: placement.x, y: placement.y };
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!drag.current || !boxRef.current) return;
+    const r = boxRef.current.getBoundingClientRect();
+    const nx = drag.current.x + (e.clientX - drag.current.px) / r.width;
+    const ny = drag.current.y + (e.clientY - drag.current.py) / r.height;
+    onPlacementChange?.({
+      x: Math.max(0, Math.min(1, nx)),
+      y: Math.max(0, Math.min(1, ny)),
+      scale: placement.scale,
+    });
+  }
+  function endDrag() {
+    drag.current = null;
+  }
 
   return (
     <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: "1 / 1" }}>
@@ -61,22 +84,40 @@ export function ShirtPreview({
         draggable={false}
       />
 
-      {/* Print area: artwork (contained) + optional text, clipped to the box. */}
-      <div className="absolute overflow-hidden" style={{ ...box, containerType: "inline-size" }}>
+      {/* Print box — clips the art so it can never print outside the area. */}
+      <div
+        ref={boxRef}
+        className="absolute overflow-hidden"
+        style={{ ...box, containerType: "inline-size", touchAction: "none" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
         {imageUrl && (
           <img
             src={imageUrl}
             alt="your design"
             crossOrigin="anonymous"
-            className="absolute inset-0 h-full w-full"
-            style={{ objectFit: "contain", mixBlendMode: artBlend, opacity: 0.97 }}
             draggable={false}
+            className="absolute select-none"
+            style={{
+              left: `${placement.x * 100}%`,
+              top: `${placement.y * 100}%`,
+              width: `${placement.scale * 100}%`,
+              height: `${placement.scale * 100}%`,
+              transform: "translate(-50%, -50%)",
+              objectFit: "contain",
+              mixBlendMode: artBlend,
+              opacity: 0.97,
+              cursor: draggable ? "grab" : "default",
+            }}
           />
         )}
 
         {label && (
           <div
-            className="absolute inset-x-0 flex justify-center px-1 text-center font-bold leading-none"
+            className="pointer-events-none absolute inset-x-0 flex justify-center px-1 text-center font-bold leading-none"
             style={{
               top: imageUrl ? "82%" : "44%",
               color: textColor,

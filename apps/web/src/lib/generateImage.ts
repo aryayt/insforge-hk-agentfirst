@@ -77,3 +77,24 @@ export async function uploadDesign(file: File, label?: string): Promise<Generate
   const imageBase64 = await fileToDataUrl(file);
   return invokeGenerate({ source: "upload", imageBase64, label: label ?? file.name });
 }
+
+export type BrandInfo = { name: string; colors: string[]; logoUrl: string | null };
+
+/**
+ * Turn a website URL into tee designs: the brand-design edge function scrapes the
+ * site's name/palette/logo and returns the logo as a placeable design plus
+ * brand-themed AI variations. Returns the brand info + the persisted designs.
+ */
+export async function generateFromBrand(
+  url: string,
+): Promise<{ brand: BrandInfo; designs: GeneratedDesign[] }> {
+  const { data, error } = await insforge.functions.invoke("brand-design", {
+    body: { url, sessionKey: sessionKey(), agentSource: "web" },
+  });
+  if (error) throw error instanceof Error ? error : new Error(String(error));
+  const res = data as { brand?: BrandInfo; designs?: GeneratedDesign[]; error?: string };
+  if (!res?.designs?.length) {
+    throw new Error(res?.error || "Couldn't build a design from that site.");
+  }
+  return { brand: res.brand ?? { name: url, colors: [], logoUrl: null }, designs: res.designs };
+}

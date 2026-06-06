@@ -4,11 +4,16 @@ import {
   aspectRatioForProduct,
   type GeneratedDesign,
 } from "@app/shared";
-import { generateVariations, uploadDesign } from "./lib/generateImage";
+import { generateDesign, uploadDesign, generateFromBrand } from "./lib/generateImage";
 import { removeWhiteBackground } from "./lib/imageProcessing";
 import { fetchProduct, money, type Tee } from "./lib/catalog";
 import { buyNow } from "./lib/checkout";
-import { ShirtPreview, type ShirtColor } from "./components/ShirtPreview";
+import {
+  ShirtPreview,
+  DEFAULT_PLACEMENT,
+  type ShirtColor,
+  type Placement,
+} from "./components/ShirtPreview";
 import { PrintReadyPanel } from "./components/PrintReadyPanel";
 import { AccountControl } from "./components/AccountControl";
 import { useAuth } from "./lib/auth";
@@ -30,14 +35,24 @@ const EXAMPLES = [
 const checkoutParam = new URLSearchParams(window.location.search).get("checkout");
 
 export function App() {
-  const { user } = useAuth();
+  const { user, requireAuth } = useAuth();
 
   // design
+  const [mode, setMode] = useState<"describe" | "url">("describe");
   const [prompt, setPrompt] = useState("");
+  const [siteUrl, setSiteUrl] = useState("");
   const [variations, setVariations] = useState<GeneratedDesign[]>([]);
   const [design, setDesign] = useState<GeneratedDesign | null>(null);
+  const [placement, setPlacement] = useState<Placement>(DEFAULT_PLACEMENT);
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const VARIATION_COUNT = 3;
+
+  // Selecting a design resets its placement to centred/fit.
+  function chooseDesign(d: GeneratedDesign | null) {
+    setDesign(d);
+    setPlacement(DEFAULT_PLACEMENT);
+  }
   const [imgError, setImgError] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [textColor, setTextColor] = useState<"#111827" | "#ffffff">("#111827");
@@ -65,31 +80,60 @@ export function App() {
   async function generate(preset?: string) {
     const q = (preset ?? prompt).trim();
     if (!q || loading) return;
+    if (!requireAuth()) return; // must be signed in to create a design
     if (preset) setPrompt(preset);
     setLoading(true);
     setImgError(null);
-    try {
-      const designs = await generateVariations(q, TEE_ASPECT_RATIO, 3);
-      setVariations(designs);
-      setDesign(designs[0] ?? null);
-    } catch (e) {
-      setImgError(e instanceof Error ? e.message : "Couldn't generate. Try again.");
-    } finally {
-      setLoading(false);
-    }
+    setVariations([]);
+    chooseDesign(null);
+    // Fire all variations at once but stream each into the UI as it lands, so the
+    // first design shows after ~one model call instead of waiting for the slowest.
+    let any = false;
+    const jobs = Array.from({ length: VARIATION_COUNT }, () =>
+      generateDesign(q, TEE_ASPECT_RATIO)
+        .then((d) => {
+          any = true;
+          setVariations((v) => [...v, d]);
+          setDesign((cur) => cur ?? d); // auto-select the first to arrive
+        })
+        .catch(() => {}),
+    );
+    await Promise.allSettled(jobs);
+    if (!any) setImgError("Couldn't generate. Try again.");
+    setLoading(false);
   }
 
   async function uploadArt(file: File | undefined) {
     if (!file || loading) return;
+    if (!requireAuth()) return; // must be signed in to create a design
     setLoading(true);
     setImgError(null);
     try {
       setPrompt("");
       const d = await uploadDesign(file);
       setVariations([d]);
-      setDesign(d);
+      chooseDesign(d);
     } catch (e) {
       setImgError(e instanceof Error ? e.message : "Couldn't upload that file.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function brandGenerate() {
+    const u = siteUrl.trim();
+    if (!u || loading) return;
+    if (!requireAuth()) return;
+    setLoading(true);
+    setImgError(null);
+    setVariations([]);
+    chooseDesign(null);
+    try {
+      const { designs } = await generateFromBrand(u);
+      setVariations(designs);
+      chooseDesign(designs[0] ?? null);
+    } catch (e) {
+      setImgError(e instanceof Error ? e.message : "Couldn't read that website.");
     } finally {
       setLoading(false);
     }
@@ -126,6 +170,7 @@ export function App() {
 
   async function handleBuy() {
     if (!variant?.stripePriceId) return;
+    if (!requireAuth()) return; // must be signed in to buy
     setBuying(true);
     setBuyError(null);
     try {
@@ -186,6 +231,8 @@ export function App() {
               printArea={printArea}
               text={text}
               textColor={textColor}
+              placement={placement}
+              onPlacementChange={setPlacement}
             />
             {loading && (
               <div className="absolute inset-0 grid place-items-center bg-white/55 backdrop-blur-[1px]">
@@ -214,6 +261,37 @@ export function App() {
             ))}
             <span className="ml-1 text-xs capitalize text-zinc-500">{shirtColor} tee</span>
           </div>
+
+          {/* Size + position — only printable inside the dashed box */}
+          {design && (
+            <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-zinc-600">
+                  Size <span className="text-zinc-400">· drag the art to move it</span>
+                </span>
+                <button
+                  onClick={() => setPlacement(DEFAULT_PLACEMENT)}
+                  className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-900"
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="text-xs text-zinc-400">A</span>
+                <input
+                  type="range"
+                  min={0.4}
+                  max={1.4}
+                  step={0.01}
+                  value={placement.scale}
+                  onChange={(e) => setPlacement((p) => ({ ...p, scale: Number(e.target.value) }))}
+                  className="h-1.5 flex-1 cursor-pointer accent-zinc-900"
+                  aria-label="design size"
+                />
+                <span className="text-lg text-zinc-400">A</span>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ── Studio panel ──────────────────────────────────────────── */}
@@ -221,44 +299,86 @@ export function App() {
           {/* Prompt */}
           <Card>
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-800">Describe your design</h2>
-              <button
-                onClick={() => generate(EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)])}
-                disabled={loading}
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-500 disabled:text-zinc-300"
-              >
-                ✨ Surprise me
-              </button>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && generate()}
-                placeholder="e.g. minimalist mountain line art"
-                className="flex-1 rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10"
-              />
-              <button
-                onClick={() => generate()}
-                disabled={loading || !prompt.trim()}
-                className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:bg-zinc-300"
-              >
-                {variations.length ? "Regenerate" : "Generate"}
-              </button>
-            </div>
-
-            {!variations.length && !loading && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {EXAMPLES.slice(0, 4).map((ex) => (
+              <div className="flex rounded-lg bg-zinc-100 p-0.5 text-xs font-medium">
+                {(["describe", "url"] as const).map((m) => (
                   <button
-                    key={ex}
-                    onClick={() => generate(ex)}
-                    className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition hover:border-zinc-300 hover:bg-white"
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={
+                      "rounded-md px-2.5 py-1 transition " +
+                      (mode === m ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800")
+                    }
                   >
-                    {ex}
+                    {m === "describe" ? "Describe" : "From a website"}
                   </button>
                 ))}
               </div>
+              {mode === "describe" && (
+                <button
+                  onClick={() => generate(EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)])}
+                  disabled={loading}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-500 disabled:text-zinc-300"
+                >
+                  ✨ Surprise me
+                </button>
+              )}
+            </div>
+
+            {mode === "describe" ? (
+              <>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && generate()}
+                    placeholder="e.g. minimalist mountain line art"
+                    className="flex-1 rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10"
+                  />
+                  <button
+                    onClick={() => generate()}
+                    disabled={loading || !prompt.trim()}
+                    className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:bg-zinc-300"
+                  >
+                    {variations.length ? "Regenerate" : "Generate"}
+                  </button>
+                </div>
+                {!variations.length && !loading && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {EXAMPLES.slice(0, 4).map((ex) => (
+                      <button
+                        key={ex}
+                        onClick={() => generate(ex)}
+                        className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 transition hover:border-zinc-300 hover:bg-white"
+                      >
+                        {ex}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={siteUrl}
+                    onChange={(e) => setSiteUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && brandGenerate()}
+                    placeholder="yourbrand.com"
+                    className="flex-1 rounded-xl border border-zinc-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-900/10"
+                  />
+                  <button
+                    onClick={brandGenerate}
+                    disabled={loading || !siteUrl.trim()}
+                    className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:bg-zinc-300"
+                  >
+                    {variations.length ? "Regenerate" : "Generate"}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-zinc-500">
+                  We pull the site's colours + logo and design a branded tee — plus the logo itself,
+                  ready to place.
+                </p>
+              </>
             )}
 
             <div className="mt-3 flex items-center gap-3 text-xs">
@@ -282,32 +402,34 @@ export function App() {
                 {loading ? "Generating options…" : "Pick a variation"}
               </h2>
               <div className="mt-3 grid grid-cols-3 gap-3">
-                {loading && variations.length === 0
-                  ? Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="aspect-square animate-pulse rounded-xl bg-zinc-100" />
-                    ))
-                  : variations.map((v) => {
-                      const selected = design?.id === v.id;
-                      return (
-                        <button
-                          key={v.id}
-                          onClick={() => setDesign(v)}
-                          className={
-                            "relative aspect-square overflow-hidden rounded-xl border-2 bg-[conic-gradient(at_50%_50%,#fafafa,#f1f1f1)] transition " +
-                            (selected
-                              ? "border-zinc-900 ring-2 ring-zinc-900/15"
-                              : "border-transparent hover:border-zinc-300")
-                          }
-                        >
-                          <img src={v.imageUrl} alt="" className="h-full w-full object-contain p-1.5" />
-                          {selected && (
-                            <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text-[10px] text-white">
-                              ✓
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
+                {variations.map((v) => {
+                  const selected = design?.id === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => chooseDesign(v)}
+                      className={
+                        "relative aspect-square overflow-hidden rounded-xl border-2 bg-[conic-gradient(at_50%_50%,#fafafa,#f1f1f1)] transition " +
+                        (selected
+                          ? "border-zinc-900 ring-2 ring-zinc-900/15"
+                          : "border-transparent hover:border-zinc-300")
+                      }
+                    >
+                      <img src={v.imageUrl} alt="" className="h-full w-full object-contain p-1.5" />
+                      {selected && (
+                        <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text-[10px] text-white">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+                {loading &&
+                  Array.from({ length: Math.max(0, VARIATION_COUNT - variations.length) }).map(
+                    (_, i) => (
+                      <div key={`s${i}`} className="aspect-square animate-pulse rounded-xl bg-zinc-100" />
+                    ),
+                  )}
               </div>
             </Card>
           )}
@@ -431,6 +553,7 @@ export function App() {
                 printArea={printArea}
                 text={text}
                 textColor={textColor}
+                placement={placement}
               />
             </div>
           </details>
