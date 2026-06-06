@@ -1,0 +1,2268 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AgentFirst: AI Custom Merch Designer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:            #0e0e0e;
+  --surface:       #171717;
+  --surface2:      #202020;
+  --border:        rgba(255,255,255,0.08);
+  --border2:       rgba(255,255,255,0.14);
+  --text:          #dedede;
+  --muted:         rgba(200,200,200,0.50);
+  --accent:        #7b8fff;
+  --accent2:       #9aaaff;
+  --accent-dim:    rgba(123,143,255,0.13);
+  --accent-border: rgba(123,143,255,0.28);
+}
+
+/* ── SPEAKER COLOR THEMES ────────────────────── */
+.spk2-slide {
+  --accent:        #22c55e;
+  --accent2:       #4ade80;
+  --accent-dim:    rgba(34,197,94,0.11);
+  --accent-border: rgba(34,197,94,0.30);
+}
+.spk3-slide {
+  --accent:        #f97316;
+  --accent2:       #fdba74;
+  --accent-dim:    rgba(249,115,22,0.11);
+  --accent-border: rgba(249,115,22,0.30);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+/* ── NAV ───────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 52px;
+  background: rgba(12,12,15,0.85);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-size: 18px; font-weight: 800;
+  color: var(--text); letter-spacing: -0.4px;
+}
+.logo span { color: var(--accent2); }
+.nav-dots { display: flex; gap: 8px; align-items: center; }
+.nav-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.18); cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.nav-dot.active {
+  background: var(--accent2);
+  width: 22px; border-radius: 3px;
+}
+.slide-label-nav {
+  font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.5px;
+}
+
+/* ── SLIDE TRANSITIONS ─────────────────────── */
+.slide {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 110px 52px 72px;
+  position: relative; overflow: hidden;
+  background: var(--bg);
+}
+.slide-inner {
+  width: 100%; max-width: 1080px;
+  opacity: 0;
+  transform: translateY(52px);
+  transition: opacity 0.75s cubic-bezier(0.4,0,0.2,1),
+              transform 0.75s cubic-bezier(0.4,0,0.2,1);
+}
+.slide-inner.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* staggered children */
+.slide-inner.visible .anim-child { animation: childIn 0.6s cubic-bezier(0.4,0,0.2,1) both; }
+.slide-inner.visible .anim-child:nth-child(1) { animation-delay: 0.05s; }
+.slide-inner.visible .anim-child:nth-child(2) { animation-delay: 0.15s; }
+.slide-inner.visible .anim-child:nth-child(3) { animation-delay: 0.25s; }
+.slide-inner.visible .anim-child:nth-child(4) { animation-delay: 0.35s; }
+.slide-inner.visible .anim-child:nth-child(5) { animation-delay: 0.42s; }
+.slide-inner.visible .anim-child:nth-child(6) { animation-delay: 0.48s; }
+@keyframes childIn {
+  from { opacity:0; transform:translateY(28px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── SLIDE DIVIDERS ────────────────────────── */
+.slide:nth-child(even) { background: var(--surface); }
+
+/* ── SPEAKER BADGES ─────────────────────────── */
+.spk-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 13px; border-radius: 100px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+}
+.spk-badge.spk1 { color: var(--accent2); background: var(--accent-dim); border: 1px solid var(--accent-border); }
+.spk-badge.spk2 { color: #86efac; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.28); }
+.spk-badge.spk3 { color: #fdba74; background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.28); }
+
+/* ── SPEAKER HANDOFF SLIDES ─────────────────── */
+.slide-handoff {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  background: var(--bg) !important;
+}
+.slide-handoff .slide-inner {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.spk-handoff-num {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(120px, 18vw, 200px); font-weight: 900; line-height: 1;
+  color: rgba(255,255,255,0.03); position: absolute;
+  user-select: none; pointer-events: none;
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+}
+.spk-handoff-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 3px;
+  text-transform: uppercase; margin-bottom: 18px;
+}
+.spk-handoff-topic {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(38px, 5.5vw, 68px);
+  font-weight: 700; line-height: 1.15; margin-bottom: 24px; color: var(--text);
+}
+.spk-handoff-timing {
+  font-size: 13px; color: var(--muted);
+  padding: 7px 20px; border-radius: 100px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border2);
+}
+
+/* subtle grid */
+.grid-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 75%);
+  opacity: 0.5;
+}
+
+/* accent glow - very subtle */
+.glow {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, var(--accent-dim) 0%, transparent 70%);
+}
+
+/* ── TYPOGRAPHY ─────────────────────────────── */
+h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(44px, 6.5vw, 88px);
+  font-weight: 900; line-height: 1.0; letter-spacing: -2px;
+  color: var(--text);
+}
+h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(32px, 4.5vw, 58px);
+  font-weight: 700; line-height: 1.1; letter-spacing: -1.5px;
+  color: var(--text); margin-bottom: 20px;
+}
+h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text); }
+.accent-word { color: var(--accent2); }
+.lead {
+  font-size: clamp(15px, 1.8vw, 18px); line-height: 1.75;
+  color: var(--muted); max-width: 560px; font-weight: 400;
+}
+.overline {
+  font-size: 11px; font-weight: 600; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--accent2);
+  margin-bottom: 20px; display: block;
+}
+
+/* ── BADGE ──────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 16px; border-radius: 100px;
+  font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  color: var(--accent2); margin-bottom: 28px;
+}
+
+/* ── CARD ───────────────────────────────────── */
+.card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 16px; padding: 28px;
+  transition: border-color 0.25s, transform 0.25s;
+}
+.card:hover { border-color: var(--accent-border); transform: translateY(-3px); }
+
+/* ── BUTTONS ────────────────────────────────── */
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 30px; border-radius: 10px;
+  background: var(--accent); color: white;
+  font-weight: 700; font-size: 14px; border: none; cursor: pointer;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+  box-shadow: 0 4px 24px rgba(140,140,140,0.18);
+}
+.btn-primary:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 8px 32px rgba(140,140,140,0.28); }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 30px; border-radius: 10px;
+  background: transparent; border: 1px solid var(--border2);
+  color: var(--text); font-weight: 600; font-size: 14px;
+  cursor: pointer; transition: border-color 0.2s; text-decoration: none;
+}
+.btn-ghost:hover { border-color: var(--accent-border); }
+
+/* ── METRICS ────────────────────────────────── */
+.metric-row {
+  display: flex; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.metric-cell { flex: 1; padding: 28px 20px; text-align: center; background: var(--surface2); }
+.metric-cell + .metric-cell { border-left: 1px solid var(--border); }
+.metric-num { font-size: 30px; font-weight: 900; color: var(--accent2); }
+.metric-lbl { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+/* ── NAV BUTTONS ────────────────────────────── */
+.nav-arrows {
+  position: fixed; bottom: 32px; right: 48px; z-index: 200;
+  display: flex; gap: 8px;
+}
+.arrow-btn {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; border: 1px solid var(--border2);
+  background: rgba(12,12,15,0.85); backdrop-filter: blur(16px);
+  color: var(--text); cursor: pointer; transition: all 0.2s;
+}
+.arrow-btn:hover { border-color: var(--accent-border); color: var(--accent2); }
+.arrow-btn.disabled { opacity: 0.25; pointer-events: none; }
+.slide-counter {
+  position: fixed; bottom: 40px; left: 52px; z-index: 200;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+
+/* ══════════════════════════════════════════════
+   SLIDE-SPECIFIC LAYOUTS
+══════════════════════════════════════════════ */
+
+/* HERO */
+.hero-inner { max-width: 780px; }
+.hero-inner h1 { margin-bottom: 24px; }
+.hero-inner .lead { margin-bottom: 40px; }
+.hero-stats {
+  margin-top: 64px; display: flex; gap: 0;
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+}
+.hero-stat { flex: 1; padding: 24px 20px; text-align: center; background: var(--surface2); }
+.hero-stat + .hero-stat { border-left: 1px solid var(--border); }
+.hero-stat-num { font-size: 26px; font-weight: 900; color: var(--accent2); }
+.hero-stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 500; letter-spacing: 0.3px; }
+
+/* TWO COLUMN */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+/* STEPS */
+.steps { display: flex; align-items: flex-start; gap: 0; position: relative; }
+.step { display: flex; flex-direction: column; align-items: center; text-align: center; flex: 1; }
+.step-line { flex: 1; height: 1px; background: var(--border2); margin-top: 28px; }
+.step-num {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; margin-bottom: 16px;
+  transition: border-color 0.25s;
+}
+.step:hover .step-num { border-color: var(--accent-border); }
+.step-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.step-desc { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 130px; }
+
+/* FEATURE GRID */
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.feature-card { padding: 28px 24px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--border); transition: border-color 0.25s, transform 0.25s; }
+.feature-card:hover { border-color: var(--accent-border); transform: translateY(-3px); }
+.feature-icon { font-size: 24px; margin-bottom: 16px; }
+.feature-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.feature-card p { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+/* REVENUE */
+.rev-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.rev-card { padding: 28px 24px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--border); text-align: center; transition: border-color 0.25s, transform 0.25s; }
+.rev-card:hover { border-color: var(--accent-border); transform: translateY(-3px); }
+.rev-card.featured { background: var(--accent-dim); border-color: var(--accent-border); }
+.rev-num { font-size: 32px; font-weight: 900; color: var(--accent2); margin: 12px 0; }
+.rev-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.rev-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* TECH TAGS */
+.tech-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.tag {
+  padding: 5px 12px; border-radius: 7px;
+  font-size: 12px; font-weight: 600;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border2); color: var(--muted);
+}
+.tag.accent { border-color: var(--accent-border); color: var(--accent2); background: var(--accent-dim); }
+
+/* PAIN ITEMS */
+.pain-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 18px 20px; border-radius: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.pain-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.pain-item h3 { font-size: 14px; margin-bottom: 4px; }
+.pain-item p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* FUNNEL */
+.funnel-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.funnel-lbl { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); width: 80px; flex-shrink: 0; }
+.funnel-bar { height: 34px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; padding-left: 14px; font-size: 12px; font-weight: 600; color: var(--text); position: relative; overflow: hidden; }
+.funnel-bar::before { content:''; position:absolute; inset:0; background: var(--accent-dim); }
+.funnel-bar span { position: relative; z-index:1; }
+
+/* STUDIO MOCKUP */
+.studio-wrap {
+  background: #0e0e0e; border: 1px solid var(--border2);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+}
+.studio-titlebar {
+  padding: 10px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.02);
+}
+.traffic-lights { display: flex; gap: 5px; }
+.tl { width: 11px; height: 11px; border-radius: 50%; }
+.tl.r { background: #555; } .tl.y { background: #555; } .tl.g { background: #555; }
+.studio-titlebar .title { flex: 1; text-align: center; font-size: 12px; font-weight: 500; color: var(--muted); }
+.studio-body { display: grid; grid-template-columns: 48px 1fr 260px; min-height: 360px; }
+.studio-toolbar { background: rgba(255,255,255,0.02); border-right: 1px solid var(--border); padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.tool { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; transition: background 0.2s; color: var(--muted); }
+.tool:hover { background: var(--surface2); color: var(--text); }
+.tool.active { background: var(--accent-dim); color: var(--accent2); }
+.studio-canvas { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; }
+.studio-right { background: rgba(255,255,255,0.015); border-left: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.panel-label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(232,232,240,0.3); margin-bottom: 8px; }
+.swatch-row { display: flex; gap: 6px; }
+.swatch { width: 26px; height: 26px; border-radius: 7px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+.swatch:hover { border-color: var(--border2); }
+.swatch.active { border-color: var(--accent2); }
+.layer { padding: 7px 10px; border-radius: 8px; font-size: 12px; display: flex; gap: 7px; align-items: center; margin-bottom: 5px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); cursor: pointer; }
+.layer.active { background: var(--accent-dim); border-color: var(--accent-border); }
+.size-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+.size-btn { padding: 6px; text-align: center; border-radius: 7px; font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.04); border: 1px solid var(--border); cursor: pointer; }
+.size-btn.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
+.price { font-size: 22px; font-weight: 900; color: var(--accent2); text-align: center; margin: 8px 0 10px; }
+.ai-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  width: 100%; max-width: 380px;
+}
+.ai-bar input-fake { flex: 1; font-size: 12px; color: var(--muted); font-family: 'Inter', sans-serif; }
+.gen-btn {
+  padding: 6px 14px; border-radius: 7px;
+  background: var(--accent); color: white;
+  font-size: 12px; font-weight: 700; border: none; cursor: pointer;
+  white-space: nowrap;
+}
+
+/* JOURNEY */
+.journey-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.j-card { padding: 20px 14px; border-radius: 12px; text-align: center; background: var(--surface2); border: 1px solid var(--border); position: relative; transition: border-color 0.25s, transform 0.25s; }
+.j-card:hover { border-color: var(--accent-border); transform: translateY(-3px); }
+.j-num { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 20px; height: 20px; border-radius: 50%; background: var(--accent); font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; color: white; }
+.j-icon { font-size: 24px; margin: 6px 0 10px; }
+.j-card h4 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+.j-card p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* PROJECTIONS TABLE */
+.proj-row { display: grid; grid-template-columns: repeat(4,1fr); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+.proj-cell { padding: 28px 20px; text-align: center; background: var(--surface2); }
+.proj-cell + .proj-cell { border-left: 1px solid var(--border); }
+.proj-cell.featured { background: var(--accent-dim); }
+.proj-period { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.proj-amount { font-size: 26px; font-weight: 900; color: var(--accent2); }
+.proj-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* STRIPE CALLOUT */
+.stripe-callout {
+  margin-top: 24px; padding: 24px 28px;
+  border-radius: 14px; background: var(--surface2);
+  border: 1px solid var(--border2);
+  display: flex; align-items: center; gap: 20px;
+}
+.stripe-icon { font-size: 32px; flex-shrink: 0; }
+.stripe-callout h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.stripe-callout p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.stripe-stat { flex-shrink: 0; text-align: right; }
+.stripe-stat .n { font-size: 24px; font-weight: 900; color: var(--accent2); }
+.stripe-stat .l { font-size: 11px; color: var(--muted); }
+
+@media (max-width: 768px) {
+  .two-col, .three-col, .feature-grid, .rev-grid, .journey-row { grid-template-columns: 1fr; }
+  .steps { flex-direction: column; align-items: center; }
+  .step-line { width: 1px; height: 32px; }
+  .proj-row { grid-template-columns: 1fr 1fr; }
+  .metric-row { flex-wrap: wrap; }
+  nav { padding: 12px 20px; }
+  .slide { padding: 90px 20px 72px; }
+  .nav-arrows { right: 20px; }
+  .slide-counter { left: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Agent<span>First</span></div>
+  <div class="nav-dots" id="navDots"></div>
+  <div class="slide-label-nav" id="navLabel">01 / Intro</div>
+</nav>
+
+<!-- ═══════════ SLIDE 1: HERO ═══════════ -->
+<section class="slide" id="slide-0">
+  <div class="grid-bg"></div>
+  <div class="glow" style="width:700px;height:500px;top:-200px;left:-200px;"></div>
+
+  <div class="slide-inner hero-inner">
+    <span class="overline anim-child">Launching 2025 · AI-Powered Merch</span>
+    <h1 class="anim-child">Design Your<br /><span class="accent-word">Custom Merch.</span></h1>
+    <p class="lead anim-child" style="margin-top:20px;">AgentFirst is an AI-assisted custom merch platform. Users pick a product - shirt, mug, or cap - design on an intelligent canvas, and receive a print-ready item at their door, all in one seamless flow.</p>
+    <div style="display:flex;gap:12px;margin-top:36px;" class="anim-child">
+      <a href="#slide-2" class="btn-primary">See How It Works →</a>
+      <a href="#slide-6" class="btn-ghost">Business Model</a>
+    </div>
+    <div class="hero-stats anim-child">
+      <div class="hero-stat">
+        <div class="hero-stat-num">🎨</div>
+        <div class="hero-stat-label">AI-Powered Design</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">👕</div>
+        <div class="hero-stat-label">Print-On-Demand</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">💳</div>
+        <div class="hero-stat-label">Stripe Checkout</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">🚀</div>
+        <div class="hero-stat-label">Built to Scale</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 2: PROBLEM ═══════════ -->
+<section class="slide" id="slide-1">
+  <div class="grid-bg"></div>
+  <div class="slide-inner">
+    <div class="two-col">
+      <div>
+        <span class="overline anim-child">01 / The Problem</span>
+        <h2 class="anim-child">Custom fashion<br />is <span class="accent-word">broken.</span></h2>
+        <p class="lead anim-child" style="margin-bottom:32px;">The existing options are either too expensive, too complex, or too generic. Customers want uniquely theirs - but the tools aren't built for them.</p>
+        <div class="anim-child">
+          <div class="pain-item">
+            <div class="pain-icon">💸</div>
+            <div><h3>Design agencies cost $500+</h3><p>Most people cannot afford professional design for a single custom merch order.</p></div>
+          </div>
+          <div class="pain-item">
+            <div class="pain-icon">🎨</div>
+            <div><h3>Tools require real expertise</h3><p>Photoshop and Illustrator have steep learning curves that kill creativity before it starts.</p></div>
+          </div>
+          <div class="pain-item">
+            <div class="pain-icon">📦</div>
+            <div><h3>Templates feel lifeless</h3><p>Existing platforms force users into generic clip-art collections nobody wants to wear.</p></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;flex-direction:column;gap:14px;" class="anim-child">
+          <div class="card" style="text-align:center;padding:36px;">
+            <div style="font-size:36px;font-weight:900;color:var(--accent2);">Growing Market</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:6px;">Custom merch is one of the fastest-growing segments in ecommerce</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="card" style="text-align:center;">
+              <div style="font-size:22px;font-weight:900;color:var(--accent2);">Personalization</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">Consumers increasingly want products made for them</div>
+            </div>
+            <div class="card" style="text-align:center;">
+              <div style="font-size:22px;font-weight:900;color:var(--accent2);">Premium Value</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">Custom designs command higher prices than generic alternatives</div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500;">Current market leaders - all missing something</div>
+            <div class="tech-tags">
+              <span class="tag">Printify - no AI</span>
+              <span class="tag">Canva - no shirts</span>
+              <span class="tag">Zazzle - outdated UX</span>
+              <span class="tag">Redbubble - no custom</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 3: SOLUTION ═══════════ -->
+<section class="slide" id="slide-2">
+  <div class="grid-bg"></div>
+  <div class="glow" style="width:600px;height:600px;bottom:-200px;right:-200px;"></div>
+  <div class="slide-inner">
+    <div style="text-align:center;margin-bottom:52px;">
+      <span class="overline anim-child">02 / The Solution</span>
+      <h2 class="anim-child">An AI Design Studio<br /><span class="accent-word">built for everyone</span></h2>
+      <p class="lead anim-child" style="margin:0 auto;">AgentFirst pairs an intuitive drawing canvas with generative AI - so anyone can create stunning, print-ready shirt designs in minutes.</p>
+    </div>
+    <div class="three-col" style="margin-bottom:36px;">
+      <div class="card anim-child" style="text-align:center;padding:36px 24px;">
+        <div style="font-size:36px;margin-bottom:16px;">🎨</div>
+        <h3>Draw Freely</h3>
+        <p style="font-size:13px;color:var(--muted);line-height:1.65;">Pressure-sensitive canvas with brushes, shapes, text, and layers. No design experience required.</p>
+      </div>
+      <div class="card anim-child" style="text-align:center;padding:36px 24px;border-color:var(--accent-border);background:var(--accent-dim);">
+        <div style="font-size:36px;margin-bottom:16px;">🤖</div>
+        <h3>AI Enhances It</h3>
+        <p style="font-size:13px;color:var(--muted);line-height:1.65;">Type a prompt or sketch a rough idea. The AI refines it into a polished, print-ready design instantly.</p>
+      </div>
+      <div class="card anim-child" style="text-align:center;padding:36px 24px;">
+        <div style="font-size:36px;margin-bottom:16px;">📦</div>
+        <h3>We Ship It</h3>
+        <p style="font-size:13px;color:var(--muted);line-height:1.65;">Pay via Stripe. We print on premium fabric and deliver in 3–5 business days. Satisfaction guaranteed.</p>
+      </div>
+    </div>
+    <div class="metric-row anim-child">
+      <div class="metric-cell"><div class="metric-num">5 min</div><div class="metric-lbl">Average design time</div></div>
+      <div class="metric-cell"><div class="metric-num">300 DPI</div><div class="metric-lbl">Print resolution via AI upscale</div></div>
+      <div class="metric-cell"><div class="metric-num">3–5 days</div><div class="metric-lbl">Delivery window</div></div>
+      <div class="metric-cell"><div class="metric-num">100%</div><div class="metric-lbl">Satisfaction guarantee</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SPEAKER 2 HANDOFF ═══════════ -->
+<section class="slide slide-handoff" id="handoff-2">
+  <div class="grid-bg"></div>
+  <div class="spk-handoff-num">2</div>
+  <div class="slide-inner">
+    <div class="spk-handoff-eyebrow spk2" style="color:#86efac;">◆ Up Next: Speaker 2</div>
+    <div class="spk-handoff-topic">The <span style="color:#86efac;">Product</span></div>
+    <div class="spk-handoff-timing">Slides 4 – 6 &nbsp;·&nbsp; 1:00 – 2:00</div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 4: FEATURES ═══════════ -->
+<section class="slide spk2-slide" id="slide-3">
+  <div class="grid-bg"></div>
+  <div class="slide-inner">
+    <div style="text-align:center;margin-bottom:48px;">
+      <span class="overline anim-child">04 / Studio Features</span>
+      <h2 class="anim-child">Powerful tools.<br /><span class="accent-word">Zero learning curve.</span></h2>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card anim-child">
+        <div class="feature-icon">🖌️</div>
+        <h3>Smart Drawing Canvas</h3>
+        <p>Pressure-sensitive brushes, customizable sizes, eraser, full undo/redo stack. Feels natural for artists and first-timers alike.</p>
+      </div>
+      <div class="feature-card anim-child" style="border-color:var(--accent-border);background:var(--accent-dim);">
+        <div class="feature-icon">🤖</div>
+        <h3>AI Prompt Generation</h3>
+        <p>Type "galaxy wolf in neon" and the AI generates a stunning design. Refine with follow-up prompts until it's exactly right.</p>
+      </div>
+      <div class="feature-card anim-child">
+        <div class="feature-icon">🔤</div>
+        <h3>Typography Engine</h3>
+        <p>300+ premium fonts, curved text, letter spacing, gradient fills, and outline effects for bold statement merch.</p>
+      </div>
+      <div class="feature-card anim-child">
+        <div class="feature-icon">✨</div>
+        <h3>One-Click AI Enhance</h3>
+        <p>Automated 300 DPI upscaling, edge sharpening, color correction, and artifact removal. Print-perfect every time.</p>
+      </div>
+      <div class="feature-card anim-child">
+        <div class="feature-icon">🎭</div>
+        <h3>Full Layer System</h3>
+        <p>Layer management with blend modes, opacity, grouping, and masking for complex multi-element designs.</p>
+      </div>
+      <div class="feature-card anim-child">
+        <div class="feature-icon">👁️</div>
+        <h3>Live 3D Preview</h3>
+        <p>Photorealistic 3D product view that rotates in real-time. See the design from every angle before you buy.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 6: INTERACTIVE STUDIO ═══════════ -->
+<style>
+/* Studio interactive styles */
+.studio-shell {
+  width: 100%; max-width: 1080px;
+  background: #0e0e0e;
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.55);
+}
+.studio-bar {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.015);
+}
+.tl2 { width: 11px; height: 11px; border-radius: 50%; background: #2a2a2a; }
+.studio-bar .s-title { flex:1; text-align:center; font-size:12px; font-weight:500; color:var(--muted); }
+.s-status { display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:var(--accent2);
+  padding: 4px 10px; border-radius:6px; background:var(--accent-dim); border:1px solid var(--accent-border); }
+
+.studio-layout {
+  display: grid;
+  grid-template-columns: 56px 1fr 1fr 260px;
+  min-height: 480px;
+}
+
+/* Left toolbar */
+.s-toolbar {
+  border-right: 1px solid var(--border);
+  padding: 12px 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: rgba(255,255,255,0.01);
+}
+.s-tool {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s; color: var(--muted);
+  position: relative;
+}
+.s-tool:hover { background: var(--surface2); color: var(--text); }
+.s-tool.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
+.s-tool-sep { width: 24px; height: 1px; background: var(--border); margin: 4px 0; }
+.s-brush-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: white; margin: 0 auto;
+  transition: all 0.18s;
+}
+
+/* Center: shirt canvas area */
+.s-canvas-area {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 28px 16px; gap: 0;
+  border-right: 1px solid var(--border);
+  position: relative;
+  background:
+    radial-gradient(ellipse 75% 65% at 50% 38%, #252525 0%, #181818 45%, #0e0e0e 100%);
+}
+/* subtle dot grid behind shirt */
+.s-canvas-area::before {
+  content: '';
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+  mask-image: radial-gradient(ellipse 70% 65% at 50% 38%, black 30%, transparent 75%);
+}
+.s-canvas-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(232,232,240,0.4); margin-bottom: 14px; position: relative;
+}
+
+/* 3D ambient stage */
+.shirt-stage {
+  transform: rotateX(6deg) rotateY(-5deg);
+  transform-style: preserve-3d;
+  filter: drop-shadow(-8px 20px 28px rgba(0,0,0,0.75)) drop-shadow(4px 6px 10px rgba(0,0,0,0.4));
+}
+/* 3D flip container */
+.shirt-scene {
+  perspective: 800px;
+  width: 260px; height: 300px;
+  cursor: crosshair;
+}
+.shirt-card {
+  width: 100%; height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+.shirt-card.flipped { transform: rotateY(180deg); }
+.shirt-face {
+  position: absolute; inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.shirt-face.back { transform: rotateY(180deg); }
+
+/* The SVG shirt + canvas overlay */
+.shirt-svg-wrap { position: relative; width: 260px; height: 300px; }
+.shirt-svg-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.shirt-canvas-layer {
+  position: absolute; inset: 0;
+  width: 260px; height: 300px;
+  cursor: crosshair;
+  clip-path: path("M 100,34 C 109,48 121,55 130,55 C 139,55 151,48 160,34 C 176,30 194,37 206,49 L 241,67 C 253,76 255,91 247,101 L 226,109 C 215,114 207,108 206,97 L 206,281 L 54,281 L 54,97 C 53,108 45,114 34,109 L 13,101 C 5,91 7,76 19,67 L 54,49 C 66,37 84,30 100,34 Z");
+  touch-action: none;
+}
+
+/* Prompt area below shirt */
+.s-prompt-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 16px; width: 100%; max-width: 340px;
+  padding: 9px 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.s-prompt-row input {
+  flex: 1; background: none; border: none; outline: none;
+  font-size: 12px; color: var(--text); font-family: 'Inter', sans-serif;
+}
+.s-prompt-row input::placeholder { color: var(--muted); }
+.s-gen-btn {
+  padding: 6px 14px; border-radius: 7px;
+  background: var(--accent); color: white;
+  font-size: 11px; font-weight: 700; border: none; cursor: pointer;
+  white-space: nowrap; transition: background 0.18s;
+  display: flex; align-items: center; gap: 5px;
+}
+.s-gen-btn:hover { background: var(--accent2); }
+.s-gen-btn.loading { background: rgba(123,143,255,0.45); pointer-events: none; }
+
+/* Hint row below prompt */
+.s-hint { font-size: 10px; color: rgba(232,232,240,0.18); margin-top: 8px; text-align:center; }
+
+/* Second center panel - preview/info */
+.s-preview-area {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 24px; gap: 14px;
+  border-right: 1px solid var(--border);
+  background: rgba(255,255,255,0.005);
+}
+.s-preview-shirt {
+  width: 100%; aspect-ratio: 4/5;
+  border-radius: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  flex: 1;
+}
+.s-preview-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(232,232,240,0.2);
+}
+.s-preview-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain;
+}
+.s-info-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 600;
+  background: var(--accent-dim); border: 1px solid var(--accent-border);
+  color: var(--accent2); width: fit-content;
+}
+
+/* Right panel */
+.s-right {
+  padding: 18px;
+  display: flex; flex-direction: column; gap: 18px;
+  background: rgba(255,255,255,0.01);
+  overflow-y: auto;
+}
+.s-section { display: flex; flex-direction: column; gap: 8px; }
+.s-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(232,232,240,0.28); }
+.s-swatch-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.s-swatch {
+  width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.06); transition: all 0.18s;
+  position: relative;
+}
+.s-swatch:hover { transform: scale(1.12); }
+.s-swatch.active::after {
+  content: ''; position: absolute; inset: -4px;
+  border-radius: 11px; border: 2px solid var(--accent2);
+}
+.ink-colors { display: flex; gap: 6px; flex-wrap: wrap; }
+.ink-dot {
+  width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.06); transition: all 0.18s;
+  position: relative;
+}
+.ink-dot.active::after {
+  content: ''; position: absolute; inset: -4px;
+  border-radius: 50%; border: 2px solid var(--accent2);
+}
+.ink-dot:hover { transform: scale(1.15); }
+.brush-sizes { display: flex; gap: 6px; }
+.b-sz {
+  flex:1; padding: 7px 0; border-radius: 7px; text-align: center;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--muted); transition: all 0.18s;
+}
+.b-sz.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
+.b-sz:hover { border-color: var(--border2); color: var(--text); }
+.s-size-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+.s-sz-btn, .s-prod-btn {
+  padding: 7px; text-align: center; border-radius: 7px;
+  font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  cursor: pointer; color: var(--muted); transition: all 0.18s;
+}
+.s-prod-btn { flex: 1; }
+.s-sz-btn.active, .s-prod-btn.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent2); }
+.s-action-row { display: flex; gap: 6px; }
+.s-act-btn {
+  flex: 1; padding: 7px; border-radius: 7px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--muted); transition: all 0.18s; text-align: center;
+}
+.s-act-btn:hover { border-color: var(--border2); color: var(--text); }
+.flip-btn {
+  width: 100%; padding: 9px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 0.2s;
+}
+.flip-btn:hover { border-color: var(--accent-border); color: var(--accent2); }
+.s-price { font-size: 24px; font-weight: 900; color: var(--accent2); text-align: center; }
+.s-checkout-btn {
+  width: 100%; padding: 12px; border-radius: 9px;
+  background: var(--accent); color: white;
+  font-weight: 700; font-size: 13px; border: none; cursor: pointer;
+  letter-spacing: 0.3px; transition: background 0.18s;
+}
+.s-checkout-btn:hover { background: var(--accent2); }
+
+/* Drawing cursor */
+.draw-cursor {
+  position: absolute; pointer-events: none; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  transform: translate(-50%,-50%);
+  transition: width 0.1s, height 0.1s;
+  z-index: 10; display: none;
+}
+
+/* AI thinking dots */
+@keyframes aiPulse { 0%,80%,100%{opacity:0.2;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+.ai-dot { width:5px;height:5px;border-radius:50%;background:var(--accent2);display:inline-block;animation:aiPulse 1.2s infinite; }
+.ai-dot:nth-child(2){animation-delay:.2s;}
+.ai-dot:nth-child(3){animation-delay:.4s;}
+</style>
+
+<section class="slide spk2-slide" id="slide-4">
+  <div class="grid-bg"></div>
+  <div class="slide-inner" style="max-width:1080px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <span class="overline anim-child">05 / Virtual Try-On Studio</span>
+      <h2 class="anim-child">Design it live. <span class="accent-word">See it on your merch.</span></h2>
+      <p class="lead anim-child" style="margin:0 auto;">Draw on the product below - it's fully interactive. Try the AI generator, switch colors, or flip to the back.</p>
+    </div>
+
+    <div class="studio-shell anim-child">
+      <!-- Titlebar -->
+      <div class="studio-bar">
+        <div style="display:flex;gap:5px;"><div class="tl2"></div><div class="tl2"></div><div class="tl2"></div></div>
+        <div class="s-title">AgentFirst Studio: Untitled Design</div>
+        <div class="s-status" id="studioStatus">● Ready to draw</div>
+      </div>
+
+      <!-- Main Layout -->
+      <div class="studio-layout">
+
+        <!-- LEFT: Tool palette -->
+        <div class="s-toolbar">
+          <div class="s-tool active" id="toolPen" title="Pen" onclick="setTool('pen',this)">✏️</div>
+          <div class="s-tool" id="toolEraser" title="Eraser" onclick="setTool('eraser',this)">◻</div>
+          <div class="s-tool-sep"></div>
+          <!-- Brush sizes as visual dots -->
+          <div class="s-tool" title="Thin" onclick="setBrushSize(2,this)" style="padding:0;">
+            <div class="s-brush-dot" style="width:4px;height:4px;"></div>
+          </div>
+          <div class="s-tool active-sz" title="Medium" onclick="setBrushSize(6,this)" style="padding:0;">
+            <div class="s-brush-dot" style="width:8px;height:8px;"></div>
+          </div>
+          <div class="s-tool" title="Thick" onclick="setBrushSize(14,this)" style="padding:0;">
+            <div class="s-brush-dot" style="width:14px;height:14px;"></div>
+          </div>
+          <div class="s-tool-sep"></div>
+          <div class="s-tool" title="Undo (Ctrl+Z)" onclick="undoDraw()" style="font-size:13px;">↩</div>
+          <div class="s-tool" title="Clear canvas" onclick="clearCanvas()" style="font-size:13px;margin-top:auto;">🗑</div>
+        </div>
+
+        <!-- CENTER LEFT: Interactive shirt canvas -->
+        <div class="s-canvas-area" id="canvasArea">
+          <div class="s-canvas-label" id="faceLabel">FRONT VIEW</div>
+          <div class="shirt-stage">
+          <div class="shirt-scene">
+            <div class="shirt-card" id="shirtCard">
+
+              <!-- FRONT FACE -->
+              <div class="shirt-face front">
+                <div class="shirt-svg-wrap" id="shirtWrapFront">
+                  <div class="draw-cursor" id="drawCursor"></div>
+                  <svg id="shirtSvgFront" viewBox="0 0 300 340" xmlns="http://www.w3.org/2000/svg" style="pointer-events:none;">
+                    <defs>
+                      <!-- Main body gradient: lit from upper-left -->
+                      <linearGradient id="shirtGradFront" x1="20%" y1="0%" x2="80%" y2="100%">
+                        <stop offset="0%"   stop-color="#38384e"/>
+                        <stop offset="30%"  stop-color="#26263a"/>
+                        <stop offset="70%"  stop-color="#181828"/>
+                        <stop offset="100%" stop-color="#0d0d1a"/>
+                      </linearGradient>
+                      <!-- Left-side shadow (darkens left third of shirt) -->
+                      <linearGradient id="leftShadowF" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="rgba(0,0,0,0.60)"/>
+                        <stop offset="28%"  stop-color="rgba(0,0,0,0.20)"/>
+                        <stop offset="55%"  stop-color="rgba(0,0,0,0)"/>
+                      </linearGradient>
+                      <!-- Right rim light (subtle highlight on right edge) -->
+                      <linearGradient id="rightRimF" x1="100%" y1="0%" x2="0%" y2="0%">
+                        <stop offset="0%"   stop-color="rgba(255,255,255,0.13)"/>
+                        <stop offset="22%"  stop-color="rgba(255,255,255,0.04)"/>
+                        <stop offset="45%"  stop-color="rgba(255,255,255,0)"/>
+                      </linearGradient>
+                      <!-- Chest highlight: main light source oval -->
+                      <radialGradient id="chestHighF" cx="44%" cy="40%" r="36%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="rgba(255,255,255,0.20)"/>
+                        <stop offset="45%"  stop-color="rgba(255,255,255,0.07)"/>
+                        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                      </radialGradient>
+                      <!-- Bottom fold shadow -->
+                      <linearGradient id="bottomShadF" x1="0%" y1="100%" x2="0%" y2="0%">
+                        <stop offset="0%"   stop-color="rgba(0,0,0,0.52)"/>
+                        <stop offset="28%"  stop-color="rgba(0,0,0,0.16)"/>
+                        <stop offset="52%"  stop-color="rgba(0,0,0,0)"/>
+                      </linearGradient>
+                      <!-- Left shoulder highlight -->
+                      <radialGradient id="shoulderLight" cx="28%" cy="22%" r="28%">
+                        <stop offset="0%"   stop-color="rgba(255,255,255,0.18)"/>
+                        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                      </radialGradient>
+                      <!-- Collar inner depth shadow -->
+                      <radialGradient id="collarDepthF" cx="50%" cy="60%" r="50%">
+                        <stop offset="0%"   stop-color="rgba(0,0,0,0.75)"/>
+                        <stop offset="100%" stop-color="rgba(0,0,0,0.1)"/>
+                      </radialGradient>
+                    </defs>
+
+                    <!-- Drop shadow (offset to simulate light from top-left) -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="rgba(0,0,0,0.0)" stroke="none" transform="translate(-5,16) scale(1.03,1.02) translate(-5,0)"
+                      style="filter:blur(18px);fill:rgba(0,0,0,0.65);"/>
+
+                    <!-- LAYER 1: Main body fill -->
+                    <path id="shirtBodyFront"
+                      d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#shirtGradFront)"
+                      stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+
+                    <!-- LAYER 2: Left-side shadow -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#leftShadowF)" pointer-events="none"/>
+
+                    <!-- LAYER 3: Right rim highlight -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#rightRimF)" pointer-events="none"/>
+
+                    <!-- LAYER 4: Chest highlight (main light source) -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#chestHighF)" pointer-events="none"/>
+
+                    <!-- LAYER 5: Bottom fold shadow -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#bottomShadF)" pointer-events="none"/>
+
+                    <!-- LAYER 6: Left shoulder highlight -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#shoulderLight)" pointer-events="none"/>
+
+                    <!-- Collar inner depth (dark ellipse inside neckline) -->
+                    <ellipse cx="150" cy="50" rx="26" ry="9" fill="url(#collarDepthF)" pointer-events="none"/>
+
+                    <!-- Collar neckband seam -->
+                    <path d="M 118,42 C 128,57 140,64 150,64 C 160,64 172,57 182,42"
+                      fill="none" stroke="rgba(255,255,255,0.20)" stroke-width="1.4"/>
+
+                    <!-- Side seams (subtle) -->
+                    <line x1="62"  y1="112" x2="62"  y2="318" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" stroke-dasharray="3,6"/>
+                    <line x1="238" y1="112" x2="238" y2="318" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" stroke-dasharray="3,6"/>
+
+                    <!-- Sleeve armhole crease shadows -->
+                    <path d="M 62,56 C 76,42 97,34 115,38" fill="none" stroke="rgba(0,0,0,0.30)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 185,38 C 203,34 224,42 238,56" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <canvas class="shirt-canvas-layer" id="frontCanvas" width="260" height="300"></canvas>
+                </div>
+              </div>
+
+              <!-- BACK FACE -->
+              <div class="shirt-face back">
+                <div class="shirt-svg-wrap" id="shirtWrapBack">
+                  <svg id="shirtSvgBack" viewBox="0 0 300 340" xmlns="http://www.w3.org/2000/svg" style="pointer-events:none;">
+                    <defs>
+                      <!-- Back: mirrored light (upper-right source since shirt is flipped) -->
+                      <linearGradient id="shirtGradBack" x1="80%" y1="0%" x2="20%" y2="100%">
+                        <stop offset="0%"   stop-color="#38384e"/>
+                        <stop offset="30%"  stop-color="#26263a"/>
+                        <stop offset="70%"  stop-color="#181828"/>
+                        <stop offset="100%" stop-color="#0d0d1a"/>
+                      </linearGradient>
+                      <!-- Right-side shadow (mirrored from front) -->
+                      <linearGradient id="rightShadowB" x1="100%" y1="0%" x2="0%" y2="0%">
+                        <stop offset="0%"   stop-color="rgba(0,0,0,0.60)"/>
+                        <stop offset="28%"  stop-color="rgba(0,0,0,0.20)"/>
+                        <stop offset="55%"  stop-color="rgba(0,0,0,0)"/>
+                      </linearGradient>
+                      <!-- Left rim light (mirrored) -->
+                      <linearGradient id="leftRimB" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="rgba(255,255,255,0.12)"/>
+                        <stop offset="22%"  stop-color="rgba(255,255,255,0.04)"/>
+                        <stop offset="45%"  stop-color="rgba(255,255,255,0)"/>
+                      </linearGradient>
+                      <!-- Back highlight (slightly right-of-center) -->
+                      <radialGradient id="backHighB" cx="56%" cy="38%" r="36%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="rgba(255,255,255,0.16)"/>
+                        <stop offset="45%"  stop-color="rgba(255,255,255,0.05)"/>
+                        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                      </radialGradient>
+                      <!-- Bottom fold shadow -->
+                      <linearGradient id="bottomShadB" x1="0%" y1="100%" x2="0%" y2="0%">
+                        <stop offset="0%"   stop-color="rgba(0,0,0,0.52)"/>
+                        <stop offset="28%"  stop-color="rgba(0,0,0,0.16)"/>
+                        <stop offset="52%"  stop-color="rgba(0,0,0,0)"/>
+                      </linearGradient>
+                      <!-- Right shoulder highlight (mirrored from front left) -->
+                      <radialGradient id="shoulderLightBack" cx="72%" cy="22%" r="28%">
+                        <stop offset="0%"   stop-color="rgba(255,255,255,0.16)"/>
+                        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                      </radialGradient>
+                    </defs>
+
+                    <!-- LAYER 1: Main body fill -->
+                    <path id="shirtBodyBack"
+                      d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#shirtGradBack)"
+                      stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+
+                    <!-- LAYER 2: Right-side shadow -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#rightShadowB)" pointer-events="none"/>
+
+                    <!-- LAYER 3: Left rim light -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#leftRimB)" pointer-events="none"/>
+
+                    <!-- LAYER 4: Back highlight -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#backHighB)" pointer-events="none"/>
+
+                    <!-- LAYER 5: Bottom fold shadow -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#bottomShadB)" pointer-events="none"/>
+
+                    <!-- LAYER 6: Right shoulder highlight -->
+                    <path d="M 115,38 C 126,54 140,62 150,62 C 160,62 174,54 185,38 C 203,34 224,42 238,56 L 278,76 C 292,86 294,103 285,115 L 261,123 C 248,129 239,122 238,110 L 238,318 L 62,318 L 62,110 C 61,122 52,129 39,123 L 15,115 C 6,103 8,86 22,76 L 62,56 C 76,42 97,34 115,38 Z"
+                      fill="url(#shoulderLightBack)" pointer-events="none"/>
+
+                    <!-- Back collar neckband seam -->
+                    <path d="M 118,42 C 128,50 140,54 150,54 C 160,54 172,50 182,42"
+                      fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1.4"/>
+
+                    <!-- Side seams -->
+                    <line x1="62"  y1="112" x2="62"  y2="318" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" stroke-dasharray="3,6"/>
+                    <line x1="238" y1="112" x2="238" y2="318" stroke="rgba(255,255,255,0.06)" stroke-width="0.8" stroke-dasharray="3,6"/>
+
+                    <!-- Center back seam -->
+                    <line x1="150" y1="58" x2="150" y2="318" stroke="rgba(255,255,255,0.05)" stroke-width="0.8" stroke-dasharray="2,7"/>
+
+                    <!-- Back sleeve armhole crease shadows (mirrored) -->
+                    <path d="M 185,38 C 203,34 224,42 238,56" fill="none" stroke="rgba(0,0,0,0.30)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M 62,56 C 76,42 97,34 115,38" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <canvas class="shirt-canvas-layer" id="backCanvas" width="260" height="300"></canvas>
+                </div>
+              </div>
+
+            </div><!-- /shirt-card -->
+          </div><!-- /shirt-scene -->
+          </div><!-- /shirt-stage -->
+
+          <!-- AI Prompt bar -->
+          <div class="s-prompt-row" style="margin-top:16px;">
+            <span style="font-size:13px;">✨</span>
+            <input type="text" id="aiPrompt" placeholder="Describe a design… e.g. neon galaxy wolf" maxlength="80"/>
+            <button class="s-gen-btn" id="genBtn" onclick="aiGenerate()">
+              <span id="genBtnText">Generate</span>
+            </button>
+          </div>
+          <div class="s-hint">Draw freely with your mouse · Ctrl+Z to undo</div>
+        </div>
+
+        <!-- CENTER RIGHT: Live preview panel -->
+        <div class="s-preview-area">
+          <div class="s-lbl" style="margin-bottom:4px;">Live Preview</div>
+          <div class="s-preview-shirt" id="previewBox">
+            <canvas id="previewCanvas" style="width:100%;height:100%;object-fit:contain;border-radius:10px;"></canvas>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="s-info-pill">🖨️ 300 DPI Print Ready</div>
+            <div class="s-info-pill" id="layerPill">✏️ Drawing on Front</div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.6;">
+              Your design is instantly rendered at print quality. What you see on screen matches what gets printed on fabric.
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Properties panel -->
+        <div class="s-right">
+
+          <!-- AI ENGINE STATUS -->
+          <div class="s-section">
+            <div class="s-lbl">AI Engine</div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--accent-dim);border:1px solid var(--accent-border);">
+              <div style="width:7px;height:7px;border-radius:50%;background:var(--accent2);flex-shrink:0;animation:aiPulse 2s infinite;"></div>
+              <div>
+                <div style="font-size:11px;font-weight:600;color:var(--accent2);">Pollinations AI</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:1px;">Free · No token needed</div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);line-height:1.6;">Type any subject below and hit <b style="color:var(--text);">Generate</b>. Takes ~20–40 s on first run.</div>
+          </div>
+
+          <div class="s-section">
+            <div class="s-lbl">Product</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <div class="s-prod-btn active" onclick="selectProductType(this,'shirt')">👕 Shirt</div>
+              <div class="s-prod-btn" onclick="selectProductType(this,'mug')">☕ Mug</div>
+              <div class="s-prod-btn" onclick="selectProductType(this,'cap')">🧢 Cap</div>
+            </div>
+          </div>
+
+          <div class="s-section">
+            <div class="s-lbl">Color</div>
+            <div class="s-swatch-row" id="shirtSwatches">
+              <div class="s-swatch active" data-color="gradient" data-display="#1e1e2c" style="background:linear-gradient(135deg,#2c2c3e,#131320);" onclick="setShirtColor(this)" title="Black"></div>
+              <div class="s-swatch" data-color="#e8e8e8" data-display="#e8e8e8" style="background:#e8e8e8;" onclick="setShirtColor(this)" title="White"></div>
+              <div class="s-swatch" data-color="#1e3a5f" data-display="#1e3a5f" style="background:#1e3a5f;" onclick="setShirtColor(this)" title="Navy"></div>
+              <div class="s-swatch" data-color="#3d1515" data-display="#3d1515" style="background:#3d1515;" onclick="setShirtColor(this)" title="Burgundy"></div>
+              <div class="s-swatch" data-color="#142814" data-display="#142814" style="background:#142814;" onclick="setShirtColor(this)" title="Forest"></div>
+              <div class="s-swatch" data-color="#2a1a3a" data-display="#2a1a3a" style="background:#2a1a3a;" onclick="setShirtColor(this)" title="Plum"></div>
+            </div>
+          </div>
+
+          <div class="s-section">
+            <div class="s-lbl">Ink Color</div>
+            <div class="ink-colors" id="inkColors">
+              <div class="ink-dot active" data-color="#e8e8f0" style="background:#e8e8f0;" onclick="setInkColor(this)"></div>
+              <div class="ink-dot" data-color="#4a6cf7" style="background:#4a6cf7;" onclick="setInkColor(this)"></div>
+              <div class="ink-dot" data-color="#f87171" style="background:#f87171;" onclick="setInkColor(this)"></div>
+              <div class="ink-dot" data-color="#34d399" style="background:#34d399;" onclick="setInkColor(this)"></div>
+              <div class="ink-dot" data-color="#fbbf24" style="background:#fbbf24;" onclick="setInkColor(this)"></div>
+              <div class="ink-dot" data-color="#f472b6" style="background:#f472b6;" onclick="setInkColor(this)"></div>
+              <div class="ink-dot" data-color="#a78bfa" style="background:#a78bfa;" onclick="setInkColor(this)"></div>
+              <div class="ink-dot" data-color="#111111" style="background:#111111;border-color:rgba(255,255,255,0.2);" onclick="setInkColor(this)"></div>
+            </div>
+          </div>
+
+          <div class="s-section">
+            <div class="s-lbl">Brush Size</div>
+            <div class="brush-sizes">
+              <div class="b-sz" onclick="setBrushSize(2,null,'sz')">S</div>
+              <div class="b-sz active" onclick="setBrushSize(6,null,'sz')">M</div>
+              <div class="b-sz" onclick="setBrushSize(14,null,'sz')">L</div>
+            </div>
+          </div>
+
+          <div class="s-section">
+            <div class="s-lbl">Size</div>
+            <div class="s-size-grid">
+              <div class="s-sz-btn" onclick="selectSize(this)">XS</div>
+              <div class="s-sz-btn" onclick="selectSize(this)">S</div>
+              <div class="s-sz-btn active" onclick="selectSize(this)">M</div>
+              <div class="s-sz-btn" onclick="selectSize(this)">L</div>
+              <div class="s-sz-btn" onclick="selectSize(this)">XL</div>
+              <div class="s-sz-btn" onclick="selectSize(this)">XXL</div>
+            </div>
+          </div>
+
+          <div class="s-section">
+            <div class="s-lbl">Actions</div>
+            <div class="s-action-row">
+              <div class="s-act-btn" onclick="undoDraw()">↩ Undo</div>
+              <div class="s-act-btn" onclick="clearCanvas()">🗑 Clear</div>
+            </div>
+            <button class="flip-btn" onclick="flipShirt()">
+              <span id="flipIcon">↔</span> <span id="flipLabel">Flip to Back</span>
+            </button>
+          </div>
+
+          <div style="margin-top:auto;">
+            <!-- AI Budget Meter -->
+            <div id="budgetMeter" style="margin-bottom:14px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">AI Design Budget</span>
+                <span id="budgetText" style="font-size:11px;font-weight:700;color:var(--text);">$0.00 / $1.00</span>
+              </div>
+              <div style="height:4px;border-radius:2px;background:var(--border2);overflow:hidden;">
+                <div id="budgetBar" style="height:100%;width:0%;border-radius:2px;background:var(--accent);transition:width 0.4s ease,background 0.4s ease;"></div>
+              </div>
+              <div id="budgetSubtext" style="font-size:10px;color:var(--muted);margin-top:5px;text-align:right;">$0.05 per generation &bull; 20 remaining</div>
+            </div>
+            <div class="s-price">$34.99</div>
+            <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px;">Free shipping over $60</div>
+            <button class="s-checkout-btn">💳 &nbsp;Checkout with Stripe</button>
+          </div>
+
+        </div>
+      </div><!-- /studio-layout -->
+    </div><!-- /studio-shell -->
+  </div>
+</section>
+
+<script>
+// ── INTERACTIVE STUDIO ENGINE ─────────────────────────────
+(function() {
+  // State
+  let activeFace = 'front';
+  let tool = 'pen';
+  let brushSize = 6;
+  let inkColor = '#e8e8f0';
+  let isDrawing = false;
+  let lastX = 0, lastY = 0;
+  let undoStack = { front: [], back: [] };
+  const MAX_UNDO = 12;
+  let genAnimFrame = null;
+  let isFlipped = false;
+  let isGenerating = false;
+  const COST_PER_GEN = 0.05;
+  const BUDGET_CAP   = 1.00;
+  let budgetUsed     = 0;
+
+  // Canvas references
+  const frontCanvas = document.getElementById('frontCanvas');
+  const backCanvas  = document.getElementById('backCanvas');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const shirtCard = document.getElementById('shirtCard');
+  const drawCursor = document.getElementById('drawCursor');
+  const statusEl = document.getElementById('studioStatus');
+  const layerPill = document.getElementById('layerPill');
+  const genBtn = document.getElementById('genBtn');
+  const genBtnText = document.getElementById('genBtnText');
+
+  function activeCanvas() { return activeFace === 'front' ? frontCanvas : backCanvas; }
+  function activeCtx() { return activeCanvas().getContext('2d'); }
+
+  // ── SETUP CANVAS CLIP PATH (ctx level) ──────────────────
+  // Exact bezier path matching the SVG (defined for 260x300 canvas space)
+  function getShirtPath(w, h) {
+    const sx = w / 260, sy = h / 300;
+    const p = new Path2D();
+    p.moveTo(100*sx, 34*sy);
+    p.bezierCurveTo(109*sx,48*sy, 121*sx,55*sy, 130*sx,55*sy);
+    p.bezierCurveTo(139*sx,55*sy, 151*sx,48*sy, 160*sx,34*sy);
+    p.bezierCurveTo(176*sx,30*sy, 194*sx,37*sy, 206*sx,49*sy);
+    p.lineTo(241*sx, 67*sy);
+    p.bezierCurveTo(253*sx,76*sy, 255*sx,91*sy, 247*sx,101*sy);
+    p.lineTo(226*sx, 109*sy);
+    p.bezierCurveTo(215*sx,114*sy, 207*sx,108*sy, 206*sx,97*sy);
+    p.lineTo(206*sx, 281*sy);
+    p.lineTo(54*sx,  281*sy);
+    p.lineTo(54*sx,  97*sy);
+    p.bezierCurveTo(53*sx,108*sy, 45*sx,114*sy, 34*sx,109*sy);
+    p.lineTo(13*sx, 101*sy);
+    p.bezierCurveTo(5*sx,91*sy, 7*sx,76*sy, 19*sx,67*sy);
+    p.lineTo(54*sx, 49*sy);
+    p.bezierCurveTo(66*sx,37*sy, 84*sx,30*sy, 100*sx,34*sy);
+    p.closePath();
+    return p;
+  }
+
+  function applyShirtClip(ctx, w, h) {
+    ctx.clip(getShirtPath(w, h));
+  }
+
+  // ── DRAWING ──────────────────────────────────────────────
+  function getPos(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return {
+      x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+      y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function saveUndo() {
+    const stack = undoStack[activeFace];
+    const c = activeCanvas();
+    stack.push(c.getContext('2d').getImageData(0, 0, c.width, c.height));
+    if (stack.length > MAX_UNDO) stack.shift();
+  }
+
+  function startDraw(e) {
+    if (isGenerating) return;
+    e.preventDefault();
+    saveUndo();
+    isDrawing = true;
+    const pos = getPos(e, activeCanvas());
+    lastX = pos.x; lastY = pos.y;
+    const ctx = activeCtx();
+    ctx.save();
+    applyShirtClip(ctx, frontCanvas.width, frontCanvas.height);
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.arc(lastX, lastY, brushSize/2, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = inkColor;
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, brushSize/2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+    updatePreview();
+  }
+
+  function doDraw(e) {
+    if (!isDrawing || isGenerating) return;
+    e.preventDefault();
+    const pos = getPos(e, activeCanvas());
+    const ctx = activeCtx();
+    ctx.save();
+    applyShirtClip(ctx, frontCanvas.width, frontCanvas.height);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(pos.x, pos.y);
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = brushSize;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.lineWidth = brushSize;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = inkColor;
+    }
+    ctx.stroke();
+    ctx.restore();
+    lastX = pos.x; lastY = pos.y;
+    updatePreview();
+    moveCursor(e);
+  }
+
+  function endDraw() { isDrawing = false; }
+
+  // Cursor tracking
+  function moveCursor(e) {
+    const rect = frontCanvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    drawCursor.style.display = 'block';
+    drawCursor.style.left = x + 'px';
+    drawCursor.style.top  = y + 'px';
+    const sz = Math.max(brushSize * (rect.width / frontCanvas.width), 8);
+    drawCursor.style.width = sz + 'px';
+    drawCursor.style.height = sz + 'px';
+  }
+  function hideCursor() { drawCursor.style.display = 'none'; }
+
+  // Attach events to both canvas layers
+  [frontCanvas, backCanvas].forEach(c => {
+    c.addEventListener('mousedown', startDraw);
+    c.addEventListener('mousemove', e => { doDraw(e); moveCursor(e); });
+    c.addEventListener('mouseup', endDraw);
+    c.addEventListener('mouseleave', () => { endDraw(); hideCursor(); });
+    c.addEventListener('touchstart', startDraw, {passive:false});
+    c.addEventListener('touchmove',  doDraw,     {passive:false});
+    c.addEventListener('touchend',   endDraw);
+  });
+  document.addEventListener('mouseup', endDraw);
+
+  // ── LIVE PREVIEW ─────────────────────────────────────────
+  function updatePreview() {
+    const c = activeCanvas();
+    const pCtx = previewCanvas.getContext('2d');
+    const pw = previewCanvas.width, ph = previewCanvas.height;
+    pCtx.clearRect(0, 0, pw, ph);
+
+    const activeSwatch = document.querySelector('.s-swatch.active');
+    const isGrad = activeSwatch.dataset.color === 'gradient';
+    const shirtColor = isGrad ? activeSwatch.dataset.display : activeSwatch.dataset.color;
+    const shirtPath = getShirtPath(pw, ph);
+
+    // All shading layers share one clip
+    pCtx.save();
+    pCtx.clip(shirtPath);
+
+    // Layer 1: main body fill (gradient or solid color)
+    if (isGrad) {
+      const g = pCtx.createLinearGradient(pw*0.2, 0, pw*0.8, ph);
+      g.addColorStop(0,   '#38384e');
+      g.addColorStop(0.3, '#26263a');
+      g.addColorStop(0.7, '#181828');
+      g.addColorStop(1,   '#0d0d1a');
+      pCtx.fillStyle = g;
+    } else {
+      pCtx.fillStyle = shirtColor || '#26263a';
+    }
+    pCtx.fillRect(0, 0, pw, ph);
+
+    // Layer 2: left-side shadow
+    const lsh = pCtx.createLinearGradient(0, 0, pw, 0);
+    lsh.addColorStop(0,    'rgba(0,0,0,0.60)');
+    lsh.addColorStop(0.28, 'rgba(0,0,0,0.20)');
+    lsh.addColorStop(0.55, 'rgba(0,0,0,0)');
+    pCtx.fillStyle = lsh; pCtx.fillRect(0, 0, pw, ph);
+
+    // Layer 3: right rim light
+    const rrm = pCtx.createLinearGradient(pw, 0, 0, 0);
+    rrm.addColorStop(0,    'rgba(255,255,255,0.13)');
+    rrm.addColorStop(0.22, 'rgba(255,255,255,0.04)');
+    rrm.addColorStop(0.45, 'rgba(255,255,255,0)');
+    pCtx.fillStyle = rrm; pCtx.fillRect(0, 0, pw, ph);
+
+    // Layer 4: chest highlight (main light source)
+    const ch = pCtx.createRadialGradient(pw*0.44, ph*0.40, 0, pw*0.44, ph*0.40, pw*0.38);
+    ch.addColorStop(0,    'rgba(255,255,255,0.20)');
+    ch.addColorStop(0.45, 'rgba(255,255,255,0.07)');
+    ch.addColorStop(1,    'rgba(255,255,255,0)');
+    pCtx.fillStyle = ch; pCtx.fillRect(0, 0, pw, ph);
+
+    // Layer 5: bottom fold shadow
+    const bsh = pCtx.createLinearGradient(0, ph, 0, 0);
+    bsh.addColorStop(0,    'rgba(0,0,0,0.52)');
+    bsh.addColorStop(0.28, 'rgba(0,0,0,0.16)');
+    bsh.addColorStop(0.52, 'rgba(0,0,0,0)');
+    pCtx.fillStyle = bsh; pCtx.fillRect(0, 0, pw, ph);
+
+    // Layer 6: left shoulder highlight
+    const sh = pCtx.createRadialGradient(pw*0.28, ph*0.22, 0, pw*0.28, ph*0.22, pw*0.28);
+    sh.addColorStop(0,  'rgba(255,255,255,0.18)');
+    sh.addColorStop(1,  'rgba(255,255,255,0)');
+    pCtx.fillStyle = sh; pCtx.fillRect(0, 0, pw, ph);
+
+    // Layer 7: user canvas strokes (scaled to preview size)
+    pCtx.drawImage(c, 0, 0, pw, ph);
+
+    pCtx.restore();
+
+    // Layer 8: AI overlay (separate save for blend mode)
+    const ovr = document.getElementById('aiOverlay_' + activeFace);
+    if (ovr && ovr._loaded) {
+      try {
+        pCtx.save();
+        pCtx.clip(shirtPath);
+        pCtx.globalCompositeOperation = ovr._blend;
+        pCtx.globalAlpha = 0.92;
+        pCtx.drawImage(ovr, pw*0.12, ph*0.22, pw*0.76, ph*0.52);
+        pCtx.restore();
+      } catch(e) { /* cross-origin taint on file:// - skipped */ }
+    }
+  }
+
+  // Set preview canvas size on load
+  function resizePreview() {
+    const box = document.getElementById('previewBox');
+    previewCanvas.width = box.clientWidth;
+    previewCanvas.height = box.clientHeight;
+    updatePreview();
+  }
+
+  // ── CONTROLS ─────────────────────────────────────────────
+  window.setTool = function(t, el) {
+    tool = t;
+    document.querySelectorAll('.s-tool[id^="tool"]').forEach(e => e.classList.remove('active'));
+    if (el) el.classList.add('active');
+    setStatus(t === 'eraser' ? '◻ Eraser active' : '✏ Pen active');
+    document.getElementById('layerPill').textContent =
+      t === 'eraser' ? '◻ Eraser Mode' : '✏ Drawing on ' + (activeFace === 'front' ? 'Front' : 'Back');
+  };
+
+  window.setBrushSize = function(sz, el, group) {
+    brushSize = sz;
+    if (el) {
+      document.querySelectorAll('.s-toolbar .s-tool').forEach(e => {
+        if (!e.id) e.classList.remove('active');
+      });
+      el.classList.add('active');
+    }
+    if (group === 'sz') {
+      document.querySelectorAll('.b-sz').forEach(e => e.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+  };
+
+  window.setShirtColor = function(el) {
+    document.querySelectorAll('.s-swatch').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    const c = el.dataset.color;
+    const frontBody = document.getElementById('shirtBodyFront');
+    const backBody  = document.getElementById('shirtBodyBack');
+    if (c === 'gradient') {
+      frontBody.setAttribute('fill', 'url(#shirtGradFront)');
+      backBody.setAttribute('fill',  'url(#shirtGradBack)');
+    } else {
+      frontBody.setAttribute('fill', c);
+      backBody.setAttribute('fill',  c);
+    }
+    updatePreview();
+    setStatus('🎨 Shirt color updated');
+  };
+
+  window.setInkColor = function(el) {
+    document.querySelectorAll('.ink-dot').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    inkColor = el.dataset.color;
+    setStatus('🖌 Ink: ' + inkColor);
+  };
+
+  window.selectSize = function(el) {
+    document.querySelectorAll('.s-sz-btn').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+  };
+
+  const PRODUCT_LABELS = { shirt: 'SHIRT VIEW', mug: 'MUG VIEW', cap: 'CAP VIEW' };
+  window.selectProductType = function(el, type) {
+    document.querySelectorAll('.s-prod-btn').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('faceLabel').textContent = PRODUCT_LABELS[type] || 'FRONT VIEW';
+    setStatus('Product: ' + type.charAt(0).toUpperCase() + type.slice(1) + ' selected');
+  };
+
+  window.undoDraw = function() {
+    const stack = undoStack[activeFace];
+    if (!stack.length) return;
+    const c = activeCanvas();
+    const ctx = c.getContext('2d');
+    ctx.putImageData(stack.pop(), 0, 0);
+    updatePreview();
+    setStatus('↩ Undone');
+  };
+
+  window.clearCanvas = function() {
+    saveUndo();
+    activeCtx().clearRect(0, 0, activeCanvas().width, activeCanvas().height);
+    // Also hide AI image overlay for this face
+    const ovr = document.getElementById('aiOverlay_' + activeFace);
+    if (ovr) { ovr.style.opacity = '0'; ovr._loaded = false; ovr.src = ''; }
+    updatePreview();
+    setStatus('🗑 Canvas cleared');
+  };
+
+  // ── FLIP ─────────────────────────────────────────────────
+  window.flipShirt = function() {
+    isFlipped = !isFlipped;
+    shirtCard.classList.toggle('flipped', isFlipped);
+    activeFace = isFlipped ? 'back' : 'front';
+    document.getElementById('faceLabel').textContent  = isFlipped ? 'BACK VIEW' : 'FRONT VIEW';
+    document.getElementById('flipLabel').textContent  = isFlipped ? 'Flip to Front' : 'Flip to Back';
+    document.getElementById('flipIcon').textContent   = isFlipped ? '↩' : '↔';
+    document.getElementById('layerPill').textContent  = '✏ Drawing on ' + (isFlipped ? 'Back' : 'Front');
+    setStatus(isFlipped ? '↩ Showing back' : '↔ Showing front');
+    setTimeout(updatePreview, 720);
+  };
+
+  // ── STATUS ───────────────────────────────────────────────
+  let statusTimeout;
+  function setStatus(msg) {
+    statusEl.textContent = '● ' + msg;
+    clearTimeout(statusTimeout);
+    statusTimeout = setTimeout(() => statusEl.textContent = '● Ready to draw', 2200);
+  }
+
+  // ── AI GENERATE ──────────────────────────────────────────
+  // ── AI GENERATE - CSS overlay (bypasses canvas CORS entirely) ──
+  const DARK_SHIRTS = new Set(['gradient','#1e3a5f','#3d1515','#142814','#2a1a3a']);
+
+  // Shirt clip-path string (matches .shirt-canvas-layer, 260×300 space)
+  const SHIRT_CLIP = 'path("M 100,34 C 109,48 121,55 130,55 C 139,55 151,48 160,34 C 176,30 194,37 206,49 L 241,67 C 253,76 255,91 247,101 L 226,109 C 215,114 207,108 206,97 L 206,281 L 54,281 L 54,97 C 53,108 45,114 34,109 L 13,101 C 5,91 7,76 19,67 L 54,49 C 66,37 84,30 100,34 Z")';
+
+  function getOrCreateOverlay(face) {
+    const id = 'aiOverlay_' + face;
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('img');
+      el.id = id;
+      el._loaded = false;
+      el._blend  = 'screen';
+      Object.assign(el.style, {
+        position:       'absolute',
+        inset:          '0',
+        width:          '100%',
+        height:         '100%',
+        objectFit:      'contain',
+        objectPosition: 'center 55%',   // push image toward shirt body
+        pointerEvents:  'none',
+        opacity:        '0',
+        transition:     'opacity 0.75s ease',
+        clipPath:       SHIRT_CLIP,     // clipped to shirt silhouette
+        zIndex:         '4',
+      });
+      const wrap = document.getElementById(face === 'front' ? 'shirtWrapFront' : 'shirtWrapBack');
+      wrap.appendChild(el);
+    }
+    return el;
+  }
+
+  function resetGenUI(label, statusMsg) {
+    isGenerating = false;
+    genBtn.classList.remove('loading');
+    genBtnText.textContent = label || 'Generate';
+    if (statusMsg) setStatus(statusMsg);
+  }
+
+  // ── SHIRT LOADING SPINNER ────────────────────────────────
+  function showShirtSpinner(face, prompt) {
+    const id = 'shirtSpinner_' + face;
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = id;
+      Object.assign(el.style, {
+        position: 'absolute', inset: '0',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: '10px', zIndex: '8', pointerEvents: 'none',
+        clipPath: 'path("M 100,34 C 109,48 121,55 130,55 C 139,55 151,48 160,34 C 176,30 194,37 206,49 L 241,67 C 253,76 255,91 247,101 L 226,109 C 215,114 207,108 206,97 L 206,281 L 54,281 L 54,97 C 53,108 45,114 34,109 L 13,101 C 5,91 7,76 19,67 L 54,49 C 66,37 84,30 100,34 Z")',
+        background: 'rgba(14,14,22,0.82)',
+        backdropFilter: 'blur(4px)',
+        transition: 'opacity 0.4s',
+      });
+      el.innerHTML = `
+        <div style="width:36px;height:36px;border-radius:50%;border:2.5px solid rgba(107,138,251,0.2);border-top-color:#6b8afb;animation:spin 0.9s linear infinite;"></div>
+        <div style="font-size:10px;font-weight:600;color:rgba(107,138,251,0.85);letter-spacing:1px;text-align:center;padding:0 20px;line-height:1.5;" id="spinnerLabel_${face}">Generating…</div>`;
+      const wrap = document.getElementById(face === 'front' ? 'shirtWrapFront' : 'shirtWrapBack');
+      wrap.appendChild(el);
+      // inject spin keyframe once
+      if (!document.getElementById('spinStyle')) {
+        const s = document.createElement('style');
+        s.id = 'spinStyle';
+        s.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+        document.head.appendChild(s);
+      }
+    }
+    el.style.opacity = '1';
+    const lbl = document.getElementById('spinnerLabel_' + face);
+    if (lbl) lbl.textContent = '"' + prompt.slice(0, 28) + (prompt.length > 28 ? '…' : '') + '"';
+  }
+
+  function hideShirtSpinner(face) {
+    const el = document.getElementById('shirtSpinner_' + face);
+    if (el) el.style.opacity = '0';
+  }
+
+  // ── AI GENERATE - Pollinations.ai (free, no token required) ─────────────
+  function updateBudgetUI() {
+    const pct      = Math.min(budgetUsed / BUDGET_CAP, 1);
+    const remaining = Math.max(0, Math.round((BUDGET_CAP - budgetUsed) / COST_PER_GEN));
+    const budgetBar  = document.getElementById('budgetBar');
+    const budgetText = document.getElementById('budgetText');
+    const budgetSub  = document.getElementById('budgetSubtext');
+    budgetText.textContent = '$' + budgetUsed.toFixed(2) + ' / $' + BUDGET_CAP.toFixed(2);
+    budgetBar.style.width  = (pct * 100) + '%';
+    if (pct >= 1) {
+      budgetBar.style.background = '#ef4444';
+      budgetSub.innerHTML = '<span style="color:#ef4444;font-weight:700;">Budget reached - no more AI generations</span>';
+    } else if (pct >= 0.7) {
+      budgetBar.style.background = '#f59e0b';
+      budgetSub.innerHTML = '$0.05 per generation &bull; ' + remaining + ' remaining';
+    } else {
+      budgetBar.style.background = 'var(--accent)';
+      budgetSub.innerHTML = '$0.05 per generation &bull; ' + remaining + ' remaining';
+    }
+  }
+
+  window.aiGenerate = function() {
+    if (isGenerating) return;
+    if (budgetUsed >= BUDGET_CAP) {
+      setStatus('❌ $1.00 AI budget reached for this design session.');
+      return;
+    }
+    const rawPrompt = (document.getElementById('aiPrompt').value || '').trim() || 'cool graphic design';
+
+    isGenerating = true;
+    genBtn.classList.add('loading');
+    genBtnText.innerHTML = '<span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span>';
+
+    const activeSw  = document.querySelector('.s-swatch.active');
+    const isDark    = DARK_SHIRTS.has(activeSw.dataset.color);
+    const blendMode = isDark ? 'screen' : 'multiply';
+
+    // Prompt engineered for clean shirt prints
+    const styleHint = isDark
+      ? 'solid black background, bright vivid colors, high contrast, glowing neon, centered graphic'
+      : 'solid white background, bold dark outlines, flat vector illustration, centered graphic';
+    const fullPrompt = rawPrompt + ', merch graphic print, ' + styleHint + ', no text, no watermark, square format, 4k';
+
+    // Show spinner on shirt
+    showShirtSpinner(activeFace, rawPrompt);
+    setStatus('✨ Generating "' + rawPrompt + '"… (~20–40 s)');
+
+    // Build Pollinations URL - img element loads this fine (no CORS restriction on <img>)
+    const encoded = encodeURIComponent(fullPrompt);
+    const seed    = Math.floor(Math.random() * 999999);
+    const url     = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&nologo=true&enhance=true&seed=${seed}`;
+
+    const ovr = getOrCreateOverlay(activeFace);
+    ovr._loaded        = false;
+    ovr._blend         = blendMode;
+    ovr.style.mixBlendMode = blendMode;
+    ovr.style.opacity  = '0';
+    ovr.src            = '';   // clear previous
+
+    // Timeout after 75 s - Pollinations can queue
+    const timer = setTimeout(() => {
+      if (!isGenerating) return;
+      hideShirtSpinner(activeFace);
+      resetGenUI('Generate', '⏱ Still loading - try a shorter prompt or retry.');
+    }, 75000);
+
+    ovr.onload = function() {
+      clearTimeout(timer);
+      hideShirtSpinner(activeFace);
+      ovr._loaded = true;
+      ovr.style.opacity = '0.95';
+      budgetUsed = Math.min(budgetUsed + COST_PER_GEN, BUDGET_CAP);
+      updateBudgetUI();
+      const budgetLeft = (BUDGET_CAP - budgetUsed).toFixed(2);
+      const suffix = budgetUsed >= BUDGET_CAP ? ' — budget limit reached' : ' — $' + budgetLeft + ' remaining';
+      resetGenUI('Generate', '✅ "' + rawPrompt + '" applied!' + suffix);
+      if (budgetUsed >= BUDGET_CAP) {
+        genBtn.disabled = true;
+        genBtn.style.opacity = '0.4';
+        genBtn.style.cursor  = 'not-allowed';
+      }
+      updatePreview();
+    };
+
+    ovr.onerror = function() {
+      clearTimeout(timer);
+      if (!isGenerating) return;
+      hideShirtSpinner(activeFace);
+      ovr._loaded = false;
+      resetGenUI('Retry', '❌ Failed - check internet and retry.');
+    };
+
+    // Small delay so UI updates before the request fires
+    setTimeout(() => { ovr.src = url; }, 80);
+  };
+
+  // Preset fallback designs (offline / error fallback only)
+  const DESIGNS = {
+    mandala: drawMandala,
+    wave:    drawWave,
+    geo:     drawGeo,
+    stars:   drawStars,
+  };
+
+  // ── DESIGN GENERATORS ────────────────────────────────────
+  function drawMandala(ctx, w, h, done) {
+    const cx = w * 0.5, cy = h * 0.52;
+    const rings = 5, spokes = 12, maxR = Math.min(w,h) * 0.28;
+    let ring = 0;
+    const colors = ['rgba(107,138,251,0.7)','rgba(168,85,247,0.5)','rgba(236,72,153,0.4)','rgba(6,182,212,0.4)','rgba(245,158,11,0.35)'];
+
+    function drawRing() {
+      if (ring >= rings) { done(); return; }
+      const r = maxR * ((ring+1)/rings);
+      const color = colors[ring % colors.length];
+      let spoke = 0;
+      const spokeInterval = setInterval(() => {
+        if (spoke >= spokes) { clearInterval(spokeInterval); ring++; setTimeout(drawRing,40); return; }
+        const angle = (spoke / spokes) * Math.PI * 2;
+        const pr = maxR * (ring/rings);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle)*pr, cy + Math.sin(angle)*pr);
+        ctx.lineTo(cx + Math.cos(angle)*r,  cy + Math.sin(angle)*r);
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+        ctx.stroke();
+        // petal
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(angle)*r, cy + Math.sin(angle)*r, 3, 0, Math.PI*2);
+        ctx.fillStyle = color; ctx.fill();
+        spoke++;
+        updatePreview();
+      }, 18);
+    }
+    // Center circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+    setTimeout(drawRing, 80);
+  }
+
+  function drawWave(ctx, w, h, done) {
+    const lines = 16;
+    const startY = h * 0.32, endY = h * 0.76;
+    let line = 0;
+
+    function nextLine() {
+      if (line >= lines) { done(); return; }
+      const y = startY + (line / (lines-1)) * (endY - startY);
+      const amp = 14 + Math.sin(line * 0.4) * 8;
+      const freq = 0.03 + line * 0.001;
+      const alpha = 0.3 + (line / lines) * 0.55;
+      const hue = 200 + line * 8;
+
+      ctx.beginPath();
+      ctx.moveTo(w * 0.18, y);
+      for (let x = w*0.18; x <= w*0.82; x += 2) {
+        ctx.lineTo(x, y + Math.sin((x * freq) + line * 0.3) * amp);
+      }
+      ctx.strokeStyle = `hsla(${hue}, 80%, 65%, ${alpha})`;
+      ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+      ctx.stroke();
+      line++;
+      updatePreview();
+      setTimeout(nextLine, 38);
+    }
+    nextLine();
+  }
+
+  function drawGeo(ctx, w, h, done) {
+    const shapes = [];
+    const cx = w*0.5, cy = h*0.52;
+    for (let i = 0; i < 18; i++) {
+      const angle = (i/18)*Math.PI*2;
+      const r = 30 + Math.random()*55;
+      shapes.push({
+        x: cx + Math.cos(angle)*r*0.7,
+        y: cy + Math.sin(angle)*r*0.85,
+        sides: Math.floor(3+Math.random()*4),
+        size: 8 + Math.random()*22,
+        color: `hsla(${200+Math.random()*120},70%,65%,0.5)`,
+        rot: Math.random()*Math.PI
+      });
+    }
+    let i = 0;
+    function next() {
+      if (i >= shapes.length) { done(); return; }
+      const s = shapes[i];
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.rot);
+      ctx.beginPath();
+      for (let k=0; k<=s.sides; k++) {
+        const a = (k/s.sides)*Math.PI*2 - Math.PI/2;
+        k === 0 ? ctx.moveTo(Math.cos(a)*s.size, Math.sin(a)*s.size)
+                : ctx.lineTo(Math.cos(a)*s.size, Math.sin(a)*s.size);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = s.color; ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+      i++;
+      updatePreview();
+      setTimeout(next, 32);
+    }
+    next();
+  }
+
+  function drawStars(ctx, w, h, done) {
+    const stars = [];
+    for (let i = 0; i < 40; i++) {
+      stars.push({
+        x: w*0.15 + Math.random()*(w*0.7),
+        y: h*0.25 + Math.random()*(h*0.55),
+        r: 1 + Math.random()*3,
+        alpha: 0.3 + Math.random()*0.7
+      });
+    }
+    let i = 0;
+    function nextStar() {
+      if (i >= stars.length) { drawConstellationLines(); return; }
+      const s = stars[i];
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(220,220,255,${s.alpha})`; ctx.fill();
+      // twinkle cross
+      if (s.r > 2) {
+        ctx.strokeStyle = `rgba(180,200,255,0.4)`; ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.moveTo(s.x-s.r*2.5,s.y); ctx.lineTo(s.x+s.r*2.5,s.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(s.x,s.y-s.r*2.5); ctx.lineTo(s.x,s.y+s.r*2.5); ctx.stroke();
+      }
+      i++;
+      updatePreview();
+      setTimeout(nextStar, 28);
+    }
+    function drawConstellationLines() {
+      let li = 0;
+      const pairs = [[0,3],[3,7],[7,12],[12,1],[1,5],[5,8],[8,14],[14,2],[2,6],[6,10]];
+      function nextLine() {
+        if (li >= pairs.length) { done(); return; }
+        const [a, b] = pairs[li];
+        if (stars[a] && stars[b]) {
+          ctx.beginPath();
+          ctx.moveTo(stars[a].x, stars[a].y);
+          ctx.lineTo(stars[b].x, stars[b].y);
+          ctx.strokeStyle = 'rgba(150,170,255,0.25)'; ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+        li++; updatePreview(); setTimeout(nextLine, 40);
+      }
+      nextLine();
+    }
+    nextStar();
+  }
+
+  // ── KEYBOARD SHORTCUTS ────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undoDraw(); }
+    if (!e.ctrlKey && !e.metaKey) {
+      if (e.key === 'e') setTool('eraser', document.getElementById('toolEraser'));
+      if (e.key === 'p') setTool('pen', document.getElementById('toolPen'));
+    }
+  });
+
+  // ── INIT ─────────────────────────────────────────────────
+  window.addEventListener('load', () => {
+    resizePreview();
+    new ResizeObserver(resizePreview).observe(document.getElementById('previewBox'));
+  });
+  setTimeout(resizePreview, 300);
+})();
+</script>
+
+<!-- ═══════════ SLIDE 7: TECH ═══════════ -->
+<section class="slide spk2-slide" id="slide-5">
+  <div class="grid-bg"></div>
+  <div class="slide-inner">
+    <div style="text-align:center;margin-bottom:48px;">
+      <span class="overline anim-child">06 / Technology</span>
+      <h2 class="anim-child">Built to <span class="accent-word">scale.</span></h2>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:840px;margin:0 auto 24px;" class="anim-child">
+      <div class="card">
+        <div class="panel-label" style="color:var(--accent2);margin-bottom:12px;">Frontend</div>
+        <div class="tech-tags">
+          <span class="tag">React 18</span><span class="tag">Next.js 14</span>
+          <span class="tag">Fabric.js</span><span class="tag">Three.js</span>
+          <span class="tag">Framer Motion</span><span class="tag">Tailwind CSS</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="panel-label" style="color:var(--accent2);margin-bottom:12px;">Backend</div>
+        <div class="tech-tags">
+          <span class="tag">Node.js</span><span class="tag">tRPC</span>
+          <span class="tag">PostgreSQL</span><span class="tag">Redis</span>
+          <span class="tag">AWS S3</span><span class="tag">Prisma ORM</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="panel-label" style="color:var(--accent2);margin-bottom:12px;">AI Layer</div>
+        <div class="tech-tags">
+          <span class="tag">Stable Diffusion</span><span class="tag">DALL·E 3</span>
+          <span class="tag">Real-ESRGAN</span><span class="tag">Custom LoRA</span>
+          <span class="tag">Remove.bg API</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="panel-label" style="color:var(--accent2);margin-bottom:12px;">Payments & Ops</div>
+        <div class="tech-tags">
+          <span class="tag accent">Stripe Checkout</span>
+          <span class="tag accent">Stripe Connect</span>
+          <span class="tag">Printful API</span>
+          <span class="tag">SendGrid</span>
+          <span class="tag">Vercel Edge</span>
+        </div>
+      </div>
+    </div>
+    <div class="stripe-callout anim-child" style="max-width:840px;margin:0 auto;">
+      <div class="stripe-icon">💳</div>
+      <div>
+        <h3>Stripe Powers Every Transaction</h3>
+        <p>PCI-DSS Level 1 compliant. One-click checkout, Apple Pay, Google Pay, 135+ currencies, and built-in fraud detection. No sensitive card data ever touches AgentFirst servers.</p>
+      </div>
+      <div class="stripe-stat">
+        <div class="n" style="font-size:18px;">PCI-DSS</div>
+        <div class="l">Level 1 Certified</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SPEAKER 3 HANDOFF ═══════════ -->
+<section class="slide slide-handoff" id="handoff-3">
+  <div class="grid-bg"></div>
+  <div class="spk-handoff-num">3</div>
+  <div class="slide-inner">
+    <div class="spk-handoff-eyebrow" style="color:#fdba74;">◆ Up Next: Speaker 3</div>
+    <div class="spk-handoff-topic">The <span style="color:#fdba74;">Business</span></div>
+    <div class="spk-handoff-timing">Slides 7 – 9 &nbsp;·&nbsp; 2:00 – 3:00</div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 8: BUSINESS MODEL ═══════════ -->
+<section class="slide spk3-slide" id="slide-6">
+  <div class="grid-bg"></div>
+  <div class="glow" style="width:600px;height:600px;top:-200px;right:-200px;"></div>
+  <div class="slide-inner">
+    <div style="text-align:center;margin-bottom:48px;">
+      <span class="overline anim-child">07 / Revenue Model</span>
+      <h2 class="anim-child">Three streams.<br /><span class="accent-word">All profitable.</span></h2>
+    </div>
+    <div class="rev-grid" style="margin-bottom:24px;">
+      <div class="rev-card anim-child">
+        <div style="font-size:28px;">👕</div>
+        <h3>Per-Order Margin</h3>
+        <div class="rev-num">💰</div>
+        <p>Shirts, mugs, and caps fulfilled via Printful. Sell at a healthy markup with no inventory risk or upfront cost.</p>
+      </div>
+      <div class="rev-card featured anim-child">
+        <div style="font-size:28px;">✨</div>
+        <h3>AI Subscription</h3>
+        <div class="rev-num">$9.99/mo</div>
+        <p>Free tier: 5 AI generations/month. Pro: unlimited generations, priority queue, exclusive style packs.</p>
+      </div>
+      <div class="rev-card anim-child">
+        <div style="font-size:28px;">🏪</div>
+        <h3>Design Marketplace</h3>
+        <div class="rev-num">20%</div>
+        <p>Creators list designs for sale. We take a 20% commission. Passive income that scales with the community.</p>
+      </div>
+    </div>
+    <div class="proj-row anim-child">
+      <div class="proj-cell">
+        <div class="proj-period">Phase 1</div>
+        <div class="proj-amount" style="font-size:18px;">Launch</div>
+        <div class="proj-label">First orders, validate model</div>
+      </div>
+      <div class="proj-cell">
+        <div class="proj-period">Phase 2</div>
+        <div class="proj-amount" style="font-size:18px;">Traction</div>
+        <div class="proj-label">Repeat customers, word of mouth</div>
+      </div>
+      <div class="proj-cell">
+        <div class="proj-period">Phase 3</div>
+        <div class="proj-amount" style="font-size:18px;">Growth</div>
+        <div class="proj-label">Paid channels, influencer deals</div>
+      </div>
+      <div class="proj-cell featured">
+        <div class="proj-period">Phase 4</div>
+        <div class="proj-amount" style="font-size:18px;">Scale</div>
+        <div class="proj-label">Marketplace + subscriptions live</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 9: GO TO MARKET ═══════════ -->
+<section class="slide spk3-slide" id="slide-7">
+  <div class="grid-bg"></div>
+  <div class="slide-inner">
+    <div style="text-align:center;margin-bottom:48px;">
+      <span class="overline anim-child">08 / Go-To-Market</span>
+      <h2 class="anim-child">Viral <span class="accent-word">by design.</span></h2>
+    </div>
+    <div class="two-col">
+      <div class="anim-child">
+        <div class="pain-item" style="margin-bottom:12px;">
+          <div class="pain-icon">📱</div>
+          <div><h3>Social-First Growth</h3><p>TikTok + Instagram Reels showing the AI design process. 60-second "design reveal" videos are inherently shareable.</p></div>
+        </div>
+        <div class="pain-item" style="margin-bottom:12px;">
+          <div class="pain-icon">🤝</div>
+          <div><h3>Influencer Seeding</h3><p>Ship free custom merch to micro-influencers. Authentic content drives trust and direct conversions.</p></div>
+        </div>
+        <div class="pain-item" style="margin-bottom:12px;">
+          <div class="pain-icon">🎓</div>
+          <div><h3>Student & Campus</h3><p>Group order discounts for clubs, sports teams, and college organizations. Built-in bulk ordering with a shared design canvas.</p></div>
+        </div>
+        <div class="pain-item">
+          <div class="pain-icon">🔄</div>
+          <div><h3>Referral Program</h3><p>Give $10, get $10. Every customer becomes a distribution channel. Tracked automatically via Stripe billing links.</p></div>
+        </div>
+      </div>
+      <div class="anim-child">
+        <div class="card" style="margin-bottom:16px;">
+          <h3 style="margin-bottom:20px;font-size:15px;color:var(--muted);font-weight:500;">Conversion Funnel</h3>
+          <div class="funnel-row">
+            <div class="funnel-lbl">Awareness</div>
+            <div class="funnel-bar" style="flex:1;"><span>Social media + organic discovery</span></div>
+          </div>
+          <div class="funnel-row">
+            <div class="funnel-lbl">Interest</div>
+            <div class="funnel-bar" style="width:75%;"><span>Opens the design studio</span></div>
+          </div>
+          <div class="funnel-row">
+            <div class="funnel-lbl">Design</div>
+            <div class="funnel-bar" style="width:55%;"><span>Creates a design with AI</span></div>
+          </div>
+          <div class="funnel-row">
+            <div class="funnel-lbl">Convert</div>
+            <div class="funnel-bar" style="width:30%;"><span>Completes checkout via Stripe</span></div>
+          </div>
+          <div class="funnel-row">
+            <div class="funnel-lbl">Retain</div>
+            <div class="funnel-bar" style="width:20%;"><span>Returns for next design</span></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="card" style="text-align:center;padding:20px;">
+            <div style="font-size:18px;font-weight:900;color:var(--accent2);">Low CAC</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Organic + referral keeps acquisition costs low</div>
+          </div>
+          <div class="card" style="text-align:center;padding:20px;">
+            <div style="font-size:18px;font-weight:900;color:var(--accent2);">High LTV</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Repeat buyers and subscription tiers drive lifetime value</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ SLIDE 10: CTA ═══════════ -->
+<section class="slide spk3-slide" id="slide-8">
+  <div class="grid-bg"></div>
+  <div class="glow" style="width:800px;height:600px;top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="slide-inner" style="text-align:center;max-width:700px;margin:0 auto;">
+    <span class="overline anim-child">Let's Build This</span>
+    <h1 class="anim-child" style="margin-bottom:24px;">The future of<br /><span class="accent-word">custom fashion.</span></h1>
+    <p class="lead anim-child" style="margin:0 auto 40px;">AgentFirst combines AI creativity, a professional design studio, and frictionless Stripe payments into one platform. Wear your imagination.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;" class="anim-child">
+      <a href="#slide-0" class="btn-primary" style="font-size:15px;padding:16px 34px;">Start Building →</a>
+      <a href="#slide-1" class="btn-ghost" style="font-size:15px;padding:16px 34px;">View Deck Again</a>
+    </div>
+    <div style="margin-top:72px;border-top:1px solid var(--border);padding-top:32px;" class="anim-child">
+      <div style="font-size:13px;color:rgba(232,232,240,0.25);font-weight:500;letter-spacing:0.5px;margin-bottom:12px;">AgentFirst: Wear Your Imagination</div>
+      <div style="display:flex;gap:28px;justify-content:center;">
+        <span style="font-size:12px;color:rgba(232,232,240,0.2);">hello@agentfirst.io</span>
+        <span style="color:rgba(232,232,240,0.1);">·</span>
+        <span style="font-size:12px;color:rgba(232,232,240,0.2);">agentfirst.io</span>
+        <span style="color:rgba(232,232,240,0.1);">·</span>
+        <span style="font-size:12px;color:rgba(232,232,240,0.2);">@agentfirstapp</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NAV CONTROLS -->
+<div class="slide-counter" id="slideCounter">1 / 10</div>
+<div class="nav-arrows">
+  <button class="arrow-btn disabled" id="prevBtn" onclick="navigate(-1)">↑</button>
+  <button class="arrow-btn" id="nextBtn" onclick="navigate(1)">↓</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const slideInners = document.querySelectorAll('.slide-inner');
+  const dots = document.getElementById('navDots');
+  const counter = document.getElementById('slideCounter');
+  const navLabel = document.getElementById('navLabel');
+  const labels = [
+    'S1 · 01 / Intro', 'S1 · 02 / Problem', 'S1 · 03 / Solution',
+    '▸ Speaker 2',
+    'S2 · 04 / Features', 'S2 · 05 / Studio', 'S2 · 06 / Tech',
+    '▸ Speaker 3',
+    'S3 · 07 / Revenue', 'S3 · 08 / Growth', 'S3 · 09 / Outro'
+  ];
+  let current = 0;
+
+  // Build dots
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    d.onclick = () => goTo(i);
+    dots.appendChild(d);
+  });
+
+  function updateUI(idx) {
+    document.querySelectorAll('.nav-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    counter.textContent = `${idx + 1} / ${slides.length}`;
+    navLabel.textContent = labels[idx] || '';
+    document.getElementById('prevBtn').classList.toggle('disabled', idx === 0);
+    document.getElementById('nextBtn').classList.toggle('disabled', idx === slides.length - 1);
+    current = idx;
+  }
+
+  function goTo(idx) {
+    idx = Math.max(0, Math.min(idx, slides.length - 1));
+    slides[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    updateUI(idx);
+  }
+
+  function navigate(dir) { goTo(current + dir); }
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') navigate(1);
+    if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft')  navigate(-1);
+  });
+
+  // Intersection observer - triggers both slide-in animation and nav update
+  const visObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      const inner = entry.target.querySelector('.slide-inner');
+      if (entry.isIntersecting) {
+        if (inner) inner.classList.add('visible');
+        const idx = Array.from(slides).indexOf(entry.target);
+        if (idx !== -1) updateUI(idx);
+      }
+    });
+  }, { threshold: 0.45 });
+
+  slides.forEach(s => visObserver.observe(s));
+  updateUI(0);
+
+  // Inject speaker badges into each content slide (absolutely positioned, no layout impact)
+  const SPEAKER_MAP = {
+    'slide-0': { label: 'Speaker 1', time: '0:00 – 1:00', cls: 'spk1' },
+    'slide-1': { label: 'Speaker 1', time: '0:00 – 1:00', cls: 'spk1' },
+    'slide-2': { label: 'Speaker 1', time: '0:00 – 1:00', cls: 'spk1' },
+    'slide-3': { label: 'Speaker 2', time: '1:00 – 2:00', cls: 'spk2' },
+    'slide-4': { label: 'Speaker 2', time: '1:00 – 2:00', cls: 'spk2' },
+    'slide-5': { label: 'Speaker 2', time: '1:00 – 2:00', cls: 'spk2' },
+    'slide-6': { label: 'Speaker 3', time: '2:00 – 3:00', cls: 'spk3' },
+    'slide-7': { label: 'Speaker 3', time: '2:00 – 3:00', cls: 'spk3' },
+    'slide-8': { label: 'Speaker 3', time: '2:00 – 3:00', cls: 'spk3' },
+  };
+  Object.entries(SPEAKER_MAP).forEach(([id, info]) => {
+    const slide = document.getElementById(id);
+    if (!slide) return;
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position:absolute;top:108px;left:52px;z-index:5;';
+    badge.innerHTML = '<span class="spk-badge ' + info.cls + '">' + info.label + ' &nbsp;·&nbsp; ' + info.time + '</span>';
+    slide.appendChild(badge);
+  });
+</script>
+</body>
+</html>
