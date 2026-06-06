@@ -11,7 +11,7 @@ Project **HK-agentfirst-1** · API base `https://dsc7y62h.us-east.insforge.app` 
 - **Storage:** bucket `designs` created (public read) for generated/uploaded artwork.
 - **Catalog:** seeded via `scripts/seed/{products,variants}.sql` — Classic Tee (8 variants), Ceramic Mug (2), Dad Cap (2).
 - **Functions:** none deployed yet (Stripe webhook + optional design-gen pending).
-- **Payments:** not configured yet — needs a Stripe **test** secret key (`insforge payments config set test sk_test_...`).
+- **Payments:** Stripe **test** key configured via the dashboard (Jun 6). Per-variant test prices: run `scripts/seed/stripe-prices.ts` once → fills `variants.stripe_price_id`.
 
 Keep this doc in sync with every schema change (same PR).
 
@@ -48,6 +48,13 @@ Wired via `insforge payments`:
 2. Mirror catalog: create Stripe products/prices, store `stripe_price_id` on `variants`. (`insforge payments products` / `prices` / `sync`.)
 3. `insforge payments webhooks` — register the InsForge-managed webhook; surface the signing secret into `.env.local`.
 4. `create_checkout` builds a Checkout Session from mirrored prices.
+
+## Demo posture (2026-06-06, branch mcp/core-loop)
+
+- **Guest checkout**: `migrations/20260606193000_guest-checkout.sql` makes `orders`/`order_items.user_id` nullable, adds `email`, `guest_token`, `design_preview_url`, and per-item `product_label`/`design_label` snapshots. The MCP server (admin client) writes guest orders directly.
+- **Paid-marking (demo)**: token-gated `/checkout/success` redirect sets `orders.status='paid'`. **Production TODO**: webhook-backed trigger on `payments.payment_history` (`type='one_time_payment' AND status='succeeded'` → mark order via `metadata->>'order_id'`), then remove the redirect-marking path.
+- **Designs (guest)**: artwork bytes live in the `designs` bucket under `guest/`; `migrations/20260606213000_agent-attribution.sql` makes `designs.user_id` nullable and adds `label`, `session_key`, `agent_source` — guest designs now persist as rows and `order_items.design_id` links to them.
+- **Attribution**: `orders.customer_name`, `agent_source` (MCP client name, e.g. `openai-mcp`; `web` for storefront), `agent_user_subject` (stable per-ChatGPT-account id, advisory), `agent_locale`. Web checkout should set `agent_source='web'` (TODO in apps/web).
 
 ## Conventions
 

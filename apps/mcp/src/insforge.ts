@@ -1,4 +1,4 @@
-import { createAdminClient } from "@insforge/sdk";
+import { createAdminClient, createClient } from "@insforge/sdk";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
@@ -38,3 +38,13 @@ const { baseUrl, apiKey } = resolveConfig();
  * every per-user query MUST be scoped by user_id in code.
  */
 export const admin = createAdminClient({ baseUrl, apiKey });
+
+/**
+ * Anon (public-key) client for runtime payment flows. InsForge's checkout endpoint
+ * accepts only a user token or the anon key — the admin/service key is rejected
+ * ("Checkout session creation requires a user token"). Guest checkout uses anon.
+ * Local dev falls back to the Vite var; deploys set INSFORGE_ANON_KEY (safe to ship —
+ * it's the public browser key: `bunx @insforge/cli secrets get ANON_KEY`).
+ */
+const anonKey = process.env.INSFORGE_ANON_KEY || process.env.VITE_INSFORGE_ANON_KEY;
+export const anon = anonKey ? createClient({ baseUrl, anonKey }) : null;

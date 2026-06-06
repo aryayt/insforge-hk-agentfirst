@@ -1,0 +1,12 @@
+# Build context excludes — the Dockerfile installs deps + builds widgets itself.
+node_modules
+**/node_modules
+.git
+**/dist
+**/.mcp-use/*/
+**/.mcp-use/sessions.json
+*.log
+.env
+.env.*
+.vercel
+**/.vercel

@@ -35,6 +35,7 @@ The MCP server is the headline. Treat it as a product, not plumbing: tool names,
 - **MCP:** `mcp-use` (hono-based server SDK + Apps SDK widget support). Streamable HTTP at `/mcp`; ChatGPT connects remotely. `createMCPServer(...).tool({...})`, `.uiResource({...})` for widgets, `.listen(port)`.
 - **Payments:** Stripe **test mode**, wired through InsForge `payments`. Never put live keys anywhere.
 - **Secrets:** app code reads `.env.local`; CLI reads `.insforge/project.json`. Both are gitignored. **Never hardcode or commit keys.** Add new vars to `.env.example` (no values).
+- **Design:** Impeccable is installed project-locally for Claude Code and Codex. Use it before frontend design/audit/polish work.
 
 ## Repo map
 
@@ -44,6 +45,7 @@ apps/web/        Vite + React storefront / design studio / checkout
 packages/shared/ Shared zod schemas + TS types (catalog, design, order)
 functions/       InsForge edge functions (Stripe webhook, fulfillment)
 docs/            PRODUCT, ARCHITECTURE, BACKEND, BRANCHING, DECISIONS/
+skills/          Tracked agent skills: InsForge, mcp-use app builders, Impeccable
 ```
 
 ## Run it
@@ -56,23 +58,24 @@ bun run typecheck      # all workspaces
 
 The MCP server reads InsForge creds from env (`INSFORGE_API_BASE_URL` + `INSFORGE_API_KEY`) and falls back to the linked `.insforge/project.json` for local dev. Run via the workspace scripts (`bun run mcp:dev`) so the cwd is `apps/mcp` — mcp-use resolves its widget toolchain from there.
 
-## Current state (2026-06-06)
+## Current state (2026-06-06, evening)
 
-- **Backend (live):** 7 tables + RLS, `designs` storage bucket, catalog seeded (tee/mug/cap). See `docs/BACKEND.md`.
-- **MCP (working):** `list_products` + `get_product` wired to InsForge; `create_design`, `add_to_cart`, `get_cart`, `create_checkout` are annotated **stubs** — these are the open feature-branch tasks.
-- **Not yet:** Stripe payments config (needs test key), the web app (`apps/web`), AI design generation, Stripe webhook function, Fly deploy.
+- **Backend (live):** 7 tables + RLS, `designs` storage bucket, catalog seeded (tee/mug/cap), Stripe **test key configured** in InsForge payments. Guest-checkout migration (`orders.user_id` nullable + anon RLS) in `migrations/` — apply with `db migrations up`.
+- **MCP (full loop):** `list_products` + `get_cart` render the `agent-shop` ChatGPT widget; `get_product`, `create_design` (imageUrl import or AI prompt → Storage), `add_to_cart`, `remove_from_cart`, `create_checkout` (guest order + InsForge Stripe checkout session), `get_order_status`; `/checkout/success|cancel` landing pages. See `docs/RUNBOOK-demo.md` for the end-to-end demo path.
+- **Web:** Vite storefront/design studio/cart/checkout/orders/data view exists, with Vercel SPA config in `vercel.json`.
+- **Not yet:** MCP OAuth (no-auth demo posture), webhook-backed fulfillment trigger, real fulfillment, production hardening.
 
 ## Before you build (checklist)
 
 1. Read `docs/PRODUCT.md` and `docs/ARCHITECTURE.md`.
 2. Check `docs/DECISIONS/` — some choices are still open; don't silently pick one.
 3. Reach for the installed InsForge skills (`insforge`, `insforge-cli`, `insforge-debug`, `insforge-integrations`) **before** guessing any InsForge API.
-4. Work on a branch in your own worktree — never commit to `main`. See `docs/BRANCHING.md`.
-5. Add any new env var to `.env.example`. Keep `docs/BACKEND.md` in sync with schema changes.
+4. Reach for `mcp-apps-builder` before MCP widget/tool work and `impeccable` before frontend design work.
+5. Work on a branch in your own worktree — never commit to `main`. See `docs/BRANCHING.md`.
+6. Add any new env var to `.env.example`. Keep `docs/BACKEND.md` in sync with schema changes.
 
 ## How agents coordinate
 
 - One branch per stream, one worktree per branch (`scripts/wt.sh`). Prefix by area: `mcp/`, `web/`, `backend/`, `shared/`, `docs/`.
 - Small PRs into `main`. Conventional commits (`feat(mcp): ...`, `fix(web): ...`).
 - If you change the catalog/order/design schema, update `packages/shared` first — it's the contract both surfaces depend on.
-

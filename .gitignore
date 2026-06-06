@@ -7,6 +7,7 @@ node_modules/
 # Env / secrets
 .env
 .env.local
+.env.deploy
 .env.*.local
 *.local
 .insforge/credentials*
@@ -43,6 +44,7 @@ coverage/
 # Tunnels
 .ngrok*
 cloudflared.log
+fly.toml
 
 # Worktrees live outside the repo dir; ignore any accidental in-tree trees
 /worktrees/
@@ -64,3 +66,8 @@ cloudflared.log
 .roo
 .trae
 .windsurf
+
+# mcp-use local widget/session output. Keep .mcp-use/tool-registry.d.ts tracked.
+apps/mcp/.mcp-use/*/
+apps/mcp/.mcp-use/sessions.json
+.vercel
