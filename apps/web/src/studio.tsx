@@ -19,12 +19,13 @@ const PRESETS: Array<{ label: string; url: string }> = [
 type Tab = "text" | "art" | "upload" | "ai";
 
 async function generateAiArt(prompt: string): Promise<string> {
-  // Optional path — requires the `generate-design` edge function + OpenRouter key.
+  // Calls the deployed `generate-design` edge function (Gemini → OpenAI fallback,
+  // keys live as InsForge secrets). Response shape: { design: { imageUrl, ... } }.
   const { data, error } = await insforge.functions.invoke("generate-design", {
-    body: { prompt },
+    body: { prompt, agentSource: "web" },
   });
   if (error) throw error;
-  const url = (data as any)?.url;
+  const url = (data as any)?.design?.imageUrl;
   if (!url) throw new Error("No image URL returned");
   return url as string;
 }
