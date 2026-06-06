@@ -160,12 +160,18 @@ export default async function (req: Request): Promise<Response> {
     return json(500, { error: "could not create order items" });
   }
 
-  // 2) Stripe Checkout Session (test) with the trusted order_id in metadata.
+  // 2) Stripe Checkout Session with the trusted order_id in metadata.
   const origin = Deno.env.get("WEB_APP_URL") ?? "";
-  const { data, error } = await admin.payments.createCheckoutSession("test", {
+  // Carry the order id back to the success page so it can show status + offer cancel.
+  const successBase = body.successUrl ?? `${origin}/?checkout=success`;
+  const successUrl = successBase + (successBase.includes("?") ? "&" : "?") + `order=${orderId}`;
+  // Flip to live by setting the STRIPE_ENV secret to "live" (after a live key + live
+  // prices are configured). Defaults to test so nothing charges real money by accident.
+  const stripeEnv = (Deno.env.get("STRIPE_ENV") ?? "test") as "test" | "live";
+  const { data, error } = await admin.payments.createCheckoutSession(stripeEnv, {
     mode: "payment",
     lineItems: [{ stripePriceId: variant.stripe_price_id, quantity: qty }],
-    successUrl: body.successUrl ?? `${origin}/?checkout=success`,
+    successUrl,
     cancelUrl: body.cancelUrl ?? `${origin}/?checkout=canceled`,
     customerEmail: body.email ?? null,
     subject: { type: "user", id: userId },
