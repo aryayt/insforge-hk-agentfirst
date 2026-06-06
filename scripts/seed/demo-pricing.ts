@@ -18,7 +18,7 @@ const SLUG = process.env.DEMO_PRICE_SLUG ?? "classic-tee";
 const TARGET_CENTS = Number(process.env.DEMO_PRICE_CENTS ?? 200);
 
 async function cliQuery(sql: string): Promise<{ rows: any[]; rowCount: number }> {
-  const proc = Bun.spawn(["npx", "--yes", "@insforge/cli@latest", "--json", "db", "query", sql], {
+  const proc = Bun.spawn(["bunx", "@insforge/cli@latest", "--json", "db", "query", sql], {
     env: { ...process.env, DO_NOT_TRACK: "1" },
     stdout: "pipe",
     stderr: "ignore",

@@ -21,6 +21,9 @@ async function stripe(path: string, form: Record<string, string>, idem: string):
     headers: {
       Authorization: `Bearer ${SK}`,
       "Content-Type": "application/x-www-form-urlencoded",
+      // Pin a stable API version: this account's default API version dropped the
+      // `coupon` param from promotion_codes create. Pinning restores the documented shape.
+      "Stripe-Version": "2024-06-20",
       "Idempotency-Key": idem,
     },
     body: new URLSearchParams(form).toString(),
@@ -50,7 +53,7 @@ const coupon = await stripe(
 const promo = await stripe(
   "promotion_codes",
   { coupon: coupon.id, code: CODE },
-  `promo_${CODE}_${PERCENT}`,
+  `promo_${CODE}_${PERCENT}_v2`,
 );
 
 console.log(`✓ Coupon ${coupon.id}: ${PERCENT}% off (once)`);

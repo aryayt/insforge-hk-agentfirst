@@ -13,7 +13,7 @@ const SK = process.env.STRIPE_SECRET_KEY;
 if (!SK) throw new Error("STRIPE_SECRET_KEY missing (run: set -a; source .env.local; set +a)");
 
 async function cliQuery(sql: string): Promise<{ rows: any[]; rowCount: number }> {
-  const proc = Bun.spawn(["npx", "--yes", "@insforge/cli@latest", "--json", "db", "query", sql], {
+  const proc = Bun.spawn(["bunx", "@insforge/cli@latest", "--json", "db", "query", sql], {
     env: { ...process.env, DO_NOT_TRACK: "1" },
     stdout: "pipe",
     stderr: "ignore",
