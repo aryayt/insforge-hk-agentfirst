@@ -13,8 +13,10 @@
 | Surface | Flow | Status |
 |---|---|---|
 | MCP (ChatGPT) | `list_products` → `get_product` → `create_design` (image import or AI prompt) → `add_to_cart` → `get_cart` → `create_checkout` (Stripe test) → `get_order_status` | ✅ full loop |
-| Web | browse → design studio (text/preset/upload) → cart → anonymous Stripe checkout → orders + `/data` live DB view | ✅ (AI button needs a key, see below) |
-| Backend | catalog + guest orders + persisted designs + Stripe test prices + agent attribution | ✅ after migrations |
+| Web | browse → design studio (text/preset/upload/**AI ✨**) → cart → anonymous Stripe checkout → orders + `/data` live DB view | ✅ full loop |
+| Backend | catalog + guest orders + persisted designs + Stripe test prices + agent attribution + AI `generate-design` function | ✅ after migrations |
+
+> **Demo pricing:** the Classic Tee is set to a flat **$2.00** (all variants) so live test payments feel real without feeling expensive — see `scripts/seed/demo-pricing.ts`. (InsForge's checkout schema has no promo-code field, so the discount is baked into the Stripe price rather than applied via a coupon.)
 
 Every order records **who and which agent** bought it: `orders.agent_source` (`openai-mcp` = ChatGPT, `web`, …), `agent_user_subject` (stable ChatGPT account id), `customer_name`, `email`. Designs persist to the `designs` table + storage bucket with the same provenance.
 
@@ -50,10 +52,17 @@ Optional local-only fallback: `OPENROUTER_API_KEY` in `.env.local` (used only if
 ## Test it
 
 ```bash
-bun run typecheck                      # all workspaces
-bun test apps/web                      # cart unit tests
-bun apps/web/verify-flow.ts            # headless e2e: catalog → order → Stripe session → paid
-bun scripts/seed/stripe-prices.ts      # one-time: per-variant Stripe TEST prices (done already)
+bun run typecheck                      # all workspaces (✓)
+bun test apps/web                      # cart unit tests (7 pass)
+
+# Headless end-to-end proofs (source env first: set -a; source .env.local; set +a)
+cd apps/web && bun verify-flow.ts      # web path: catalog → guest order → Stripe session → paid
+cd apps/web && bun verify-ai.ts        # AI path: SDK functions.invoke → generate-design → image URL
+cd apps/mcp && bun verify-mcp.ts       # MCP loop over real transport (server must be running)
+
+# One-time backend seeds (idempotent)
+bun scripts/seed/stripe-prices.ts      # per-variant Stripe TEST prices
+bun scripts/seed/demo-pricing.ts       # Classic Tee → flat $2.00 (DB + Stripe)
 ```
 
 MCP loop in the inspector (`http://localhost:8788/inspector`):
@@ -95,7 +104,7 @@ skills/          Vendored InsForge agent skills (insforge, insforge-cli, -debug,
 
 ## Roadmap (GitHub issues)
 
-#1 MCP Apps-SDK widgets (in-chat product/design UI) · #2 AI design edge function (web AI button) · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment (replace success-redirect paid-marking) · #5 production deploy.
+#1 MCP Apps-SDK widgets (in-chat product/design UI) · ~~#2 AI design edge function~~ ✅ done · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment (replace success-redirect paid-marking) · #5 production deploy.
 
 Next UX work queued behind those: show the print placement zone on the product preview, real image upload to Storage from the web studio, lightweight background-removal for uploaded art.
 

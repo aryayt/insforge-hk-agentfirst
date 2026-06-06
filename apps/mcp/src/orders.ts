@@ -8,7 +8,7 @@
  *
  * DEMO POSTURE: marking paid on the success redirect is acceptable for the
  * hackathon (Stripe only redirects after a completed test payment). The
- * production path is a webhook-backed trigger on payments.payment_history —
+ * production path is a webhook-backed trigger on payments.payment_history:
  * see docs/BACKEND.md.
  */
 import { admin, anon } from "./insforge";
@@ -46,7 +46,7 @@ export async function findVariantBySku(sku: string): Promise<VariantHit | null> 
   return {
     variantId: v.id as string,
     sku: v.sku as string,
-    productLabel: `${p.name as string} — ${v.color as string}${size ? ` / ${size}` : ""}`,
+    productLabel: `${p.name as string} - ${v.color as string}${size ? ` / ${size}` : ""}`,
     unitPriceCents: (p.base_price_cents as number) + ((v.price_delta_cents as number) ?? 0),
     stripePriceId: (v.stripe_price_id as string | null) ?? null,
   };
@@ -72,7 +72,7 @@ export async function createGuestCheckout(
   attribution: CheckoutAttribution = {},
 ): Promise<CheckoutResult> {
   const { email } = attribution;
-  if (cart.length === 0) throw new Error("Cart is empty — add something first.");
+  if (cart.length === 0) throw new Error("Cart is empty. Add something first.");
 
   const missing = cart.filter((i) => !i.stripePriceId);
   if (missing.length > 0) {
@@ -124,7 +124,7 @@ export async function createGuestCheckout(
   // `||` (not `??`) so an empty MCP_PUBLIC_URL placeholder in .env falls back to
   // localhost rather than producing a relative URL (InsForge requires absolute URLs).
   const publicUrl = process.env.MCP_PUBLIC_URL || `http://localhost:${process.env.MCP_PORT || 8788}`;
-  // InsForge's createCheckoutSessionBodySchema is strict — verified against
+  // InsForge's createCheckoutSessionBodySchema is strict. Verified against
   // @insforge/shared-schemas: only mode/lineItems/successUrl/cancelUrl/subject/
   // customerEmail/metadata/idempotencyKey are accepted. There is no coupon/promo
   // field, so discounts must be baked into the Stripe Price (see demo-pricing.ts).
