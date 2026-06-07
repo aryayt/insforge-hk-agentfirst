@@ -1611,7 +1611,21 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
 
     pCtx.restore();
 
-    // Layer 8: AI overlay (separate save for blend mode)
+    // Layer 8: showcase pre-loaded design
+    const scId = activeProduct === 'mug' ? 'aiShowcase_mug' : activeProduct === 'cap' ? 'aiShowcase_cap' : 'aiShowcase_shirt';
+    const sc = document.getElementById(scId);
+    if (sc && sc._loaded) {
+      try {
+        pCtx.save();
+        pCtx.clip(shirtPath);
+        pCtx.globalCompositeOperation = 'screen';
+        pCtx.globalAlpha = 0.88;
+        pCtx.drawImage(sc, pw*0.08, ph*0.14, pw*0.84, pw*0.84);
+        pCtx.restore();
+      } catch(e) {}
+    }
+
+    // Layer 9: user AI overlay
     const ovr = document.getElementById('aiOverlay_' + activeFace);
     if (ovr && ovr._loaded) {
       try {
@@ -2118,10 +2132,31 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text);
     }
   });
 
+  // ── SHOWCASE PRELOAD ──────────────────────────────────────
+  function preloadShowcaseDesigns() {
+    const designs = [
+      { id: 'aiShowcase_shirt', prompt: 'bold neon dragon fire streetwear graphic print, no text, no watermark, black background, square', seed: 1337 },
+      { id: 'aiShowcase_mug',   prompt: 'mountain peak sunrise watercolor illustration wrap print, no text, no watermark, black background, square', seed: 2048 },
+      { id: 'aiShowcase_cap',   prompt: 'minimalist lightning bolt logo emblem graphic, no text, no watermark, black background, square', seed: 777  },
+    ];
+    designs.forEach(({ id, prompt, seed }) => {
+      const el = document.createElement('img');
+      el.id = id;
+      el._loaded = false;
+      el.style.display = 'none';
+      el.crossOrigin = 'anonymous';
+      el.onload  = () => { el._loaded = true; updatePreview(); };
+      el.onerror = () => {};
+      el.src = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=768&height=768&nologo=true&seed=' + seed;
+      document.body.appendChild(el);
+    });
+  }
+
   // ── INIT ─────────────────────────────────────────────────
   window.addEventListener('load', () => {
     resizePreview();
     new ResizeObserver(resizePreview).observe(document.getElementById('previewBox'));
+    preloadShowcaseDesigns();
   });
   setTimeout(resizePreview, 300);
 })();
