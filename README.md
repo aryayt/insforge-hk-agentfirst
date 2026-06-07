@@ -12,7 +12,7 @@
 
 | Surface | Flow | Status |
 |---|---|---|
-| MCP (ChatGPT) | `list_products` widget -> `get_product` -> `analyze_brand` or `create_design` -> `add_to_cart` -> `get_cart` widget -> `remove_from_cart` if needed -> `create_checkout` (Stripe test) -> `get_order_status` | ✅ full loop + widgets |
+| MCP (ChatGPT) | `list_products` storefront widget -> `get_product` detail widget -> `analyze_brand` brand-kit widget or `create_design` design-preview widget -> `add_to_cart` / `get_cart` cart widget -> `remove_from_cart` if needed -> `create_checkout` (Stripe test) -> `get_order_status` | ✅ full loop + 5 widgets |
 | Web | company URL -> brand colors/logo/concepts -> photoreal tee placement -> transparent print file -> signed-in Stripe checkout -> order status | ✅ full loop |
 | Backend | catalog + persisted designs + Stripe test prices + agent attribution + AI `generate-design` + URL-to-brand `brand-design` + Printful function path | ✅ migrations current |
 
@@ -124,9 +124,9 @@ skills/          Vendored agent skills (InsForge, mcp-use app builders, Impeccab
 
 ## Roadmap (GitHub issues)
 
-#1 MCP Apps-SDK widgets: catalog/cart/design/brand done · ~~#2 AI design edge function~~ ✅ done · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment hardening · #5 production deploy.
+#1 MCP Apps-SDK widgets: storefront/product/design/brand/cart done · ~~#2 AI design edge function~~ ✅ done · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment hardening · #5 production deploy.
 
-Current UX direction: the web app owns the detailed design studio because it has enough room for brand intake, drag placement, scaling, background cleanup, Printful mockups, and print-file preview. The ChatGPT app stays compact: product browsing, URL-to-brand concepts, generated-design previews, cart review, and deep links into the web studio rather than a full desktop editor inside the chat pane.
+Current UX direction: the web app owns the detailed design studio because it has enough room for brand intake, drag placement, scaling, background cleanup, Printful mockups, and print-file preview. The ChatGPT app stays compact but visual: product browsing, product detail, URL-to-brand concepts, generated-design previews, and cart review, with deep links into the web studio rather than a full desktop editor inside the chat pane.
 
 ## Team
 

@@ -1,6 +1,6 @@
 # Live Deployment
 
-> Updated 2026-06-06 after the ChatGPT widget production fix. Both surfaces are live; root-domain DNS is still pending in Cloudflare.
+> Updated 2026-06-06 after the multi-widget ChatGPT app production fix. Both surfaces are live; root-domain DNS is still pending in Cloudflare.
 
 ## Live URLs
 
@@ -68,8 +68,8 @@ Use `codex mcp remove agent-shop` before re-adding if you need to change the URL
 ## Verified against live endpoints
 
 - `https://app.agentfirst.shop` → 200 with current Vercel assets.
-- `MCP_URL=https://app.agentfirst.shop/mcp bun apps/mcp/verify-widget.ts` → 9 tools, widget metadata on `list_products`, `create_design`, `analyze_brand`, and `get_cart`, one `ui://widget/agent-shop.html` resource.
-- `curl -I https://app.agentfirst.shop/mcp` → 200 through the Vercel proxy to InsForge compute.
+- `MCP_URL=https://app.agentfirst.shop/mcp bun apps/mcp/verify-widget.ts` → 9 tools, widget metadata on 7 tools (`list_products`, `get_product`, `create_design`, `analyze_brand`, `add_to_cart`, `get_cart`, `remove_from_cart`), and 5 resources (`storefront`, `product-detail`, `design-preview`, `brand-kit`, `cart-summary`).
+- `https://app.agentfirst.shop/mcp` → verified through the Vercel proxy to InsForge compute with the MCP JSON-RPC probe.
 - `curl -I https://mcp.agentfirst.shop/mcp` → TLS failure until Cloudflare/Vercel/Fly custom-hostname config is fixed.
 
 ## Gotchas hit (and fixed)
@@ -77,6 +77,7 @@ Use `codex mcp remove agent-shop` before re-adding if you need to change the URL
 - **mcp-use binds `localhost` by default** → unreachable on Fly (HTTP 000). Fixed by setting `HOST=0.0.0.0` (now baked into the `Dockerfile` + set on the live service).
 - **`MCP_PUBLIC_URL`** must point at the deployed endpoint or checkout builds a localhost success URL that InsForge rejects. Set via `compute update`.
 - **Production widgets require `mcp-use build` before `NODE_ENV=production` runtime**. The Dockerfile builds the widget into `apps/mcp/dist` before setting `NODE_ENV=production`.
+- **Remote Docker build may fall back from `bun install --frozen-lockfile` to `bun install`** if Bun wants to normalize the lockfile. Current image still builds and runs, but refresh `bun.lock` before longer-term hardening.
 - **Web env is baked at build time** (Vite inlines `VITE_*`). The static deploy carries the backend URL + anon/publishable keys; rebuild to change them.
 
 ## Redeploy

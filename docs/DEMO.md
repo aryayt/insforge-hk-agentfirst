@@ -11,6 +11,7 @@
 ```bash
 bun install
 set -a; source .env.local; set +a            # InsForge + Stripe TEST keys
+# Local rehearsal only:
 bun run mcp:dev    # → http://localhost:8788/mcp  (inspector: /inspector)
 bun run web:dev    # → http://localhost:5173
 ```
@@ -18,20 +19,30 @@ bun run web:dev    # → http://localhost:5173
 Pre-flight (proves the whole thing is live, ~30s):
 
 ```bash
-cd apps/web && bun verify-flow.ts && bun verify-ai.ts && cd ../mcp && bun verify-mcp.ts
+MCP_URL=https://app.agentfirst.shop/mcp bun apps/mcp/verify-widget.ts
+set -a; source .env.local; set +a
+bun -e 'import { createClient } from "@insforge/sdk"; const c=createClient({baseUrl:process.env.VITE_INSFORGE_API_BASE_URL, anonKey:process.env.VITE_INSFORGE_ANON_KEY}); const {data,error}=await c.functions.invoke("brand-design",{body:{url:"lesearch.ai",sessionKey:"demo-preflight",agentSource:"demo"}}); if(error) throw error; console.log(data.brand, data.designs?.map(d=>d.label));'
 ```
 
-All three should print ✓ lines ending in a `checkout.stripe.com` URL / `MCP loop OK`.
+The MCP probe should show 9 tools, 7 widget-enabled tools, and 5 widget resources. The brand probe should return four LeSearch AI design options: logo, crest, signal, and wordmark.
 
 ## Act 1 — The agent does it (MCP, the headline)
 
-Open the inspector at `http://localhost:8788/inspector` (or, deployed, connect in ChatGPT — see RUNBOOK §5) and run, in order:
+Connect ChatGPT to `https://app.agentfirst.shop/mcp` (Developer mode, No Auth) and prompt:
+
+```text
+Use AgentFirst Merch. I have a brand called LeSearch AI at lesearch.ai and an event next week.
+Show me merch concepts from the brand, choose a black Classic Tee in size L, add the best design
+to my cart, and give me a Stripe checkout link.
+```
+
+Expected tool path:
 
 1. `list_products` → 3 products (Classic Tee, Ceramic Mug, Dad Cap)
 2. `get_product` `slug=classic-tee` → variants + SKUs
-3. `create_design` `prompt="retro space moon base, clean vector art"` → **AI generates the artwork** (Gemini, server-side via InsForge edge function + secrets), returns a preview URL + design id
-4. `add_to_cart` `sku=tee-blk-l designId=<id from step 3>`
-5. `get_cart` → **$2.00**
+3. `analyze_brand` `url=lesearch.ai` → extracts logo/colors and returns transparent print concepts
+4. `add_to_cart` `sku=tee-blk-l designId=<chosen brand design id>`
+5. `get_cart` → visual cart summary
 6. `create_checkout` `name="Ada Lovelace" email=you@example.com` → returns a **Stripe checkout link**
 7. Open the link → pay with **`4242 4242 4242 4242`** (any future expiry / CVC / ZIP)
 8. Land on the success page → `get_order_status` → **PAID**
@@ -59,7 +70,7 @@ Open the inspector at `http://localhost:8788/inspector` (or, deployed, connect i
 - **Paid-marking** is on the Stripe success redirect (token-gated), not yet a webhook — production path is a trigger on `payments.payment_history` (issue #4).
 - **Fulfillment is mock** (no print-on-demand wired).
 - **No promo-code field** at checkout — InsForge's checkout schema doesn't expose one, so the "agent deal" is baked into the $2 price.
-- **In-chat visual widget** (design/preview inside ChatGPT itself) is issue #1 — today the agent surface is text + a checkout link; the *visual* design lives on the web surface.
+- **Detailed design editing** lives on the web studio. ChatGPT has compact visual widgets for storefront, product detail, brand kit, design preview, and cart, but not the full drag/resize editor.
 
 ## If something breaks mid-demo
 

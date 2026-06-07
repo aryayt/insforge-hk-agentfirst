@@ -1,17 +1,11 @@
 /**
- * brand-design — InsForge edge function (Deno).
+ * brand-design - InsForge edge function (Deno).
  *
- * Given a website URL, it extracts the brand's identity and turns it into tee
- * designs:
- *   1. Scrape the page for name, colour palette (theme-color / inline hex), and
- *      a logo (apple-touch-icon / og:image / icon link / favicon).
- *   2. Return the logo itself as a placeable design (when it's a raster image).
- *   3. Generate original, print-ready artwork in the brand's palette (Gemini),
- *      using the logo as a style reference — NOT copied (trademark-safe).
- * Each result is persisted (Storage + a guest `designs` row) like generate-design.
+ * Given a company domain, scrape basic brand signals and return persisted,
+ * transparent print concepts that are safe to place directly on merch.
  *
- * Deploy:  bunx @insforge/cli functions deploy brand-design --file functions/brand-design.ts
- * Invoke:  insforge.functions.invoke('brand-design', { body: { url, sessionKey?, agentSource? } })
+ * Deploy:
+ *   bunx @insforge/cli functions deploy brand-design --file functions/brand-design.ts
  */
 import { createAdminClient } from "npm:@insforge/sdk";
 
@@ -22,29 +16,45 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
+
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-function b64ToBytes(b64: string): Uint8Array {
-  const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
-  const bin = atob(clean);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-function bytesToB64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
+type Brand = {
+  name: string;
+  domain: string;
+  colors: string[];
+  logoUrl: string | null;
+};
+
+type Design = {
+  id: string;
+  label: string;
+  imageUrl: string;
+  imageKey: string;
+};
+
+type Admin = ReturnType<typeof createAdminClient>;
+
+function normalizeUrl(value: string): URL | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (!["http:", "https:"].includes(url.protocol)) return null;
+    if (/^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/i.test(url.hostname)) {
+      return null;
+    }
+    return url;
+  } catch {
+    return null;
+  }
 }
 
-// ── Scrape ────────────────────────────────────────────────────────────────────
-type Brand = { name: string; colors: string[]; logoUrl: string | null };
-
-function abs(href: string, base: string): string {
+function absolute(href: string, base: string): string {
   try {
     return new URL(href, base).toString();
   } catch {
@@ -52,124 +62,174 @@ function abs(href: string, base: string): string {
   }
 }
 
-function pickColors(html: string): string[] {
-  const found = new Map<string, number>();
-  const theme = html.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["'](#[0-9a-fA-F]{3,6})/i);
-  if (theme?.[1]) found.set(theme[1].toLowerCase(), 100);
-  for (const m of html.matchAll(/#[0-9a-fA-F]{6}\b/g)) {
-    const hex = m[0].toLowerCase();
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    // Skip near-white, near-black, and low-saturation grays — keep brand accents.
-    if (max > 240 && min > 240) continue;
-    if (max < 30) continue;
-    if (max - min < 24) continue;
-    found.set(hex, (found.get(hex) ?? 0) + 1);
-  }
-  return [...found.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map((e) => e[0]);
+function htmlAttr(tag: string, name: string): string | null {
+  const m = tag.match(new RegExp(`${name}=["']([^"']+)`, "i"));
+  return m?.[1] ?? null;
+}
+
+function cleanupName(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 64);
+}
+
+function pickName(html: string, url: URL): string {
+  const site = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)/i);
+  if (site?.[1]) return cleanupName(site[1]);
+  const app = html.match(/<meta[^>]+name=["']application-name["'][^>]+content=["']([^"']+)/i);
+  if (app?.[1]) return cleanupName(app[1]);
+  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (title?.[1]) return cleanupName(title[1].split(/[|–—·]/)[0] ?? title[1]);
+  return url.hostname.replace(/^www\./, "");
 }
 
 function pickLogo(html: string, base: string): string | null {
-  const apple = html.match(/<link[^>]+rel=["'][^"']*apple-touch-icon[^"']*["'][^>]+href=["']([^"']+)/i);
-  if (apple?.[1]) return abs(apple[1], base);
+  const links = [...html.matchAll(/<link[^>]+>/gi)].map((m) => m[0]);
+  for (const rel of ["apple-touch-icon", "mask-icon", "icon", "shortcut icon"]) {
+    const tag = links.find((l) => htmlAttr(l, "rel")?.toLowerCase().includes(rel));
+    const href = tag ? htmlAttr(tag, "href") : null;
+    if (href) return absolute(href, base);
+  }
   const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)/i);
-  if (og?.[1]) return abs(og[1], base);
-  const icon = html.match(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]+href=["']([^"']+)/i);
-  if (icon?.[1]) return abs(icon[1], base);
-  return abs("/favicon.ico", base);
+  if (og?.[1]) return absolute(og[1], base);
+  return absolute("/favicon.ico", base);
 }
 
-function pickName(html: string, url: string): string {
-  const site = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)/i);
-  if (site?.[1]) return site[1].trim().slice(0, 60);
-  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  if (title?.[1]) return title[1].split(/[|\-–—·]/)[0].trim().slice(0, 60);
-  return new URL(url).hostname.replace(/^www\./, "");
+function normalizeColor(hex: string): string {
+  if (hex.length === 4) {
+    const [, r, g, b] = hex;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return hex.toLowerCase();
 }
 
-async function scrape(url: string): Promise<Brand> {
+function isUsefulColor(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max > 242 && min > 242) return false;
+  if (max < 26) return false;
+  return max - min >= 20;
+}
+
+function pickColors(html: string): string[] {
+  const found = new Map<string, number>();
+  for (const m of html.matchAll(/<meta[^>]+name=["']theme-color["'][^>]+content=["'](#[0-9a-fA-F]{3,6})/gi)) {
+    const hex = normalizeColor(m[1]!);
+    if (isUsefulColor(hex)) found.set(hex, 1000);
+  }
+  for (const m of html.matchAll(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g)) {
+    const hex = normalizeColor(m[0]);
+    if (isUsefulColor(hex)) found.set(hex, (found.get(hex) ?? 0) + 1);
+  }
+  return [...found.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([hex]) => hex);
+}
+
+async function scrape(url: URL): Promise<Brand> {
   const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; AgentShopBot/1.0)" },
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; AgentFirstShop/0.1)" },
     redirect: "follow",
   });
-  const html = (await res.text()).slice(0, 600_000);
-  const base = res.url || url;
-  return { name: pickName(html, url), colors: pickColors(html), logoUrl: pickLogo(html, base) };
+  if (!res.ok) throw new Error(`Website returned ${res.status}`);
+  const html = (await res.text()).slice(0, 700_000);
+  const finalUrl = new URL(res.url || url.toString());
+  const colors = pickColors(html);
+  return {
+    name: pickName(html, finalUrl),
+    domain: finalUrl.hostname.replace(/^www\./, ""),
+    colors: colors.length ? colors : ["#111827", "#14b8a6", "#f8fafc"],
+    logoUrl: pickLogo(html, finalUrl.toString()),
+  };
 }
 
-async function fetchRasterLogo(
-  logoUrl: string | null,
-): Promise<{ bytes: Uint8Array; mime: string } | null> {
+async function fetchLogo(logoUrl: string | null): Promise<{ bytes: Uint8Array; contentType: string } | null> {
   if (!logoUrl) return null;
   try {
-    const res = await fetch(logoUrl, { headers: { "User-Agent": "AgentShopBot/1.0" } });
+    const res = await fetch(logoUrl, { headers: { "User-Agent": "AgentFirstShop/0.1" } });
     if (!res.ok) return null;
-    const mime = res.headers.get("content-type")?.split(";")[0] ?? "";
-    if (!/image\/(png|jpe?g|webp)/.test(mime)) return null; // raster only (no svg/ico)
+    const contentType = res.headers.get("content-type")?.split(";")[0] ?? "image/png";
+    if (!/^image\/(png|jpe?g|webp|svg\+xml)$/i.test(contentType)) return null;
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (!bytes.length || bytes.length > 8_000_000) return null;
-    return { bytes, mime };
+    if (!bytes.length || bytes.length > 4_000_000) return null;
+    return { bytes, contentType };
   } catch {
     return null;
   }
 }
 
-// ── Generate themed art (Gemini) ───────────────────────────────────────────────
-async function generateThemed(
-  brand: Brand,
-  logo: { bytes: Uint8Array; mime: string } | null,
-  variant: string,
-): Promise<Uint8Array | null> {
-  const key = Deno.env.get("GOOGLE_AI_API_KEY");
-  if (!key) return null;
-  const model = Deno.env.get("GOOGLE_IMAGE_MODEL") ?? "gemini-2.5-flash-image";
-  const palette = brand.colors.length ? brand.colors.join(", ") : "the brand's colours";
-  const prompt =
-    `Create an ORIGINAL, print-ready t-shirt graphic inspired by the brand "${brand.name}". ${variant} ` +
-    `Use this colour palette: ${palette}. Bold, high-contrast, limited palette, single centered subject. ` +
-    `Place it on a plain solid pure-white (#FFFFFF) background — no transparency checkerboard, no grid, no pattern. ` +
-    `Do NOT reproduce, trace, or include the actual logo, brand name, or any text; make a fresh emblem that simply evokes the brand's vibe and colours.`;
-  const parts: Array<Record<string, unknown>> = [{ text: prompt }];
-  if (logo) {
-    parts.push({ inlineData: { mimeType: logo.mime, data: bytesToB64(logo.bytes) } });
-  }
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts }] }),
-    },
-  );
-  if (!res.ok) {
-    console.error("gemini error", res.status, (await res.text()).slice(0, 300));
-    return null;
-  }
-  const out = await res.json();
-  const ps: Array<{ inlineData?: { data?: string } }> = out?.candidates?.[0]?.content?.parts ?? [];
-  const b64 = ps.find((p) => p.inlineData?.data)?.inlineData?.data;
-  return b64 ? b64ToBytes(b64) : null;
+function escapeXml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// ── Persist ─────────────────────────────────────────────────────────────────
-type Admin = ReturnType<typeof createAdminClient>;
-type Design = { id: string; label: string; imageUrl: string; imageKey: string };
+function initials(name: string): string {
+  const parts = name.match(/[A-Za-z0-9]+/g) ?? [name];
+  return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase().slice(0, 2) || "AF";
+}
+
+function conceptSvg(brand: Brand, variant: "crest" | "signal" | "wordmark"): string {
+  const primary = brand.colors[0] ?? "#111827";
+  const accent = brand.colors[1] ?? "#14b8a6";
+  const light = brand.colors[2] ?? "#f8fafc";
+  const name = escapeXml(brand.name);
+  const mark = escapeXml(initials(brand.name));
+
+  if (variant === "signal") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600">
+      <rect width="1600" height="1600" fill="none"/>
+      <circle cx="800" cy="800" r="510" fill="${primary}"/>
+      <circle cx="800" cy="800" r="455" fill="none" stroke="${light}" stroke-width="36"/>
+      <path d="M460 970c116-300 564-300 680 0" fill="none" stroke="${accent}" stroke-width="68" stroke-linecap="round"/>
+      <path d="M585 970c72-174 358-174 430 0" fill="none" stroke="${light}" stroke-width="50" stroke-linecap="round" opacity=".95"/>
+      <circle cx="800" cy="930" r="58" fill="${accent}"/>
+      <text x="800" y="745" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="190" font-weight="900" fill="${light}" letter-spacing="4">${mark}</text>
+    </svg>`;
+  }
+
+  if (variant === "wordmark") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1200" viewBox="0 0 2200 1200">
+      <rect width="2200" height="1200" rx="160" fill="none"/>
+      <rect x="150" y="250" width="1900" height="500" rx="96" fill="${primary}"/>
+      <path d="M320 850h1560" stroke="${accent}" stroke-width="72" stroke-linecap="round"/>
+      <text x="1100" y="575" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="178" font-weight="900" fill="${light}" letter-spacing="2">${name}</text>
+      <text x="1100" y="930" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="82" font-weight="800" fill="${primary}" letter-spacing="14">EVENT EDITION</text>
+    </svg>`;
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600">
+    <rect width="1600" height="1600" fill="none"/>
+    <path d="M800 145 1290 330v410c0 330-195 555-490 715-295-160-490-385-490-715V330z" fill="${primary}"/>
+    <path d="M800 235 1190 382v348c0 258-145 448-390 590-245-142-390-332-390-590V382z" fill="none" stroke="${accent}" stroke-width="46"/>
+    <text x="800" y="770" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="360" font-weight="950" fill="${light}">${mark}</text>
+    <path d="M565 960h470" stroke="${accent}" stroke-width="60" stroke-linecap="round"/>
+    <text x="800" y="1118" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="82" font-weight="850" fill="${light}" letter-spacing="10">${name.slice(0, 18)}</text>
+  </svg>`;
+}
+
+function bytesFromString(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+function extension(contentType: string): string {
+  if (contentType.includes("svg")) return "svg";
+  if (contentType.includes("webp")) return "webp";
+  if (contentType.includes("jpeg") || contentType.includes("jpg")) return "jpg";
+  return "png";
+}
 
 async function persist(
   admin: Admin,
   bytes: Uint8Array,
-  meta: { source: string; label: string; prompt: string | null; sessionKey: string; agentSource: string },
+  contentType: string,
+  meta: { source: "ai" | "upload"; label: string; prompt: string | null; sessionKey: string; agentSource: string },
 ): Promise<Design | null> {
-  const key = `guest/${crypto.randomUUID()}.png`;
-  const file = new File([bytes], key.split("/").pop()!, { type: "image/png" });
+  const key = `guest/${crypto.randomUUID()}.${extension(contentType)}`;
+  const file = new File([bytes], key.split("/").pop()!, { type: contentType });
   const { data: up, error: upErr } = await admin.storage.from("designs").upload(key, file);
   if (upErr || !up?.url || !up?.key) {
-    console.error("upload error", upErr);
+    console.error("brand storage upload error", upErr);
     return null;
   }
+
   const { data: rows, error: dbErr } = await admin.database
     .from("designs")
     .insert([
@@ -186,11 +246,11 @@ async function persist(
     ])
     .select();
   if (dbErr) {
-    console.error("designs insert error", dbErr);
+    console.error("brand design row error", dbErr);
     return null;
   }
   const row = (rows as Array<{ id: string }>)[0];
-  return { id: row?.id, label: meta.label, imageUrl: up.url, imageKey: up.key };
+  return row?.id ? { id: row.id, label: meta.label, imageUrl: up.url, imageKey: up.key } : null;
 }
 
 export default async function (req: Request): Promise<Response> {
@@ -203,22 +263,17 @@ export default async function (req: Request): Promise<Response> {
   } catch {
     return json(400, { error: "JSON body required" });
   }
-  let raw = body.url?.trim();
-  if (!raw) return json(400, { error: "url required" });
-  if (!/^https?:\/\//i.test(raw)) raw = `https://${raw}`;
-  let url: string;
-  try {
-    url = new URL(raw).toString();
-  } catch {
-    return json(400, { error: "invalid url" });
-  }
+
+  const url = normalizeUrl(body.url ?? "");
+  if (!url) return json(400, { error: "Enter a public http(s) company URL or domain." });
 
   let brand: Brand;
   try {
     brand = await scrape(url);
   } catch (e) {
-    console.error("scrape failed", e);
-    return json(502, { error: "Couldn't read that website. Check the URL and try again." });
+    return json(502, {
+      error: e instanceof Error ? `Couldn't read that website: ${e.message}` : "Couldn't read that website.",
+    });
   }
 
   const admin = createAdminClient({
@@ -227,17 +282,11 @@ export default async function (req: Request): Promise<Response> {
   });
   const sessionKey = body.sessionKey ?? "web";
   const agentSource = body.agentSource ?? "web";
-  const logo = await fetchRasterLogo(brand.logoUrl);
-
-  // Themed art (2 variations, in parallel) + the logo as a placeable design.
-  const [t1, t2] = await Promise.all([
-    generateThemed(brand, logo, "Clean iconic emblem."),
-    generateThemed(brand, logo, "Modern badge / crest style."),
-  ]);
-
   const designs: Design[] = [];
+
+  const logo = await fetchLogo(brand.logoUrl);
   if (logo) {
-    const d = await persist(admin, logo.bytes, {
+    const d = await persist(admin, logo.bytes, logo.contentType, {
       source: "upload",
       label: `${brand.name} logo`,
       prompt: null,
@@ -246,20 +295,19 @@ export default async function (req: Request): Promise<Response> {
     });
     if (d) designs.push(d);
   }
-  for (const bytes of [t1, t2]) {
-    if (!bytes) continue;
-    const d = await persist(admin, bytes, {
+
+  for (const variant of ["crest", "signal", "wordmark"] as const) {
+    const svg = conceptSvg(brand, variant);
+    const d = await persist(admin, bytesFromString(svg), "image/svg+xml", {
       source: "ai",
-      label: `${brand.name} design`,
-      prompt: `brand design for ${url}`,
+      label: `${brand.name} ${variant}`,
+      prompt: `Transparent ${variant} merch concept for ${brand.domain}`,
       sessionKey,
       agentSource,
     });
     if (d) designs.push(d);
   }
 
-  if (!designs.length) {
-    return json(502, { error: "Couldn't build a design from that site. Try another URL." });
-  }
+  if (!designs.length) return json(502, { error: "Couldn't save brand designs. Check storage/function logs." });
   return json(200, { brand, designs });
 }
