@@ -1,0 +1,341 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.widget-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--widget-border);
+  background: var(--widget-surface);
+  color: var(--widget-text);
+  box-shadow: 0 8px 18px var(--widget-shadow);
+}
+
+.widget-shell[data-theme="light"] {
+  --widget-surface: #fbfcfb;
+  --widget-panel: #ffffff;
+  --widget-panel-muted: #f0f5f2;
+  --widget-border: #d9e2dd;
+  --widget-shadow: rgba(15, 23, 42, 0.08);
+  --widget-text: #111816;
+  --widget-muted: #41544d;
+  --widget-soft-text: #5e716a;
+  --widget-card: #ffffff;
+  --widget-card-border: #d6e0dc;
+  --widget-accent: #117a55;
+  --widget-accent-ink: #ffffff;
+  --widget-accent-soft: #e3f4ec;
+  --widget-accent-alt: #234b9b;
+  --widget-line: #e5ece8;
+  --widget-skeleton: #e4ebe7;
+  --widget-skeleton-active: #f6f8f7;
+}
+
+.widget-shell[data-theme="dark"] {
+  --widget-surface: #101614;
+  --widget-panel: #161f1c;
+  --widget-panel-muted: #1d2a26;
+  --widget-border: #2d4039;
+  --widget-shadow: rgba(0, 0, 0, 0.34);
+  --widget-text: #eef5f1;
+  --widget-muted: #b8c8c0;
+  --widget-soft-text: #93a79e;
+  --widget-card: #151f1b;
+  --widget-card-border: #33483f;
+  --widget-accent: #46d28f;
+  --widget-accent-ink: #07110d;
+  --widget-accent-soft: rgba(70, 210, 143, 0.14);
+  --widget-accent-alt: #8faef8;
+  --widget-line: #26352f;
+  --widget-skeleton: #24342f;
+  --widget-skeleton-active: #33463f;
+}
+
+.widget-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+}
+
+.widget-header {
+  display: grid;
+  gap: 12px;
+}
+
+.widget-header-main {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.widget-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--widget-soft-text);
+}
+
+.widget-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.widget-subtitle {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--widget-muted);
+  line-height: 1.5;
+}
+
+.widget-card {
+  border: 1px solid var(--widget-card-border);
+  background: var(--widget-card);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.widget-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.widget-grid.catalog {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.widget-grid.two-up {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.widget-inline {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.widget-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.widget-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--widget-card-border);
+  background: var(--widget-panel-muted);
+  color: var(--widget-muted);
+  font-size: 13px;
+}
+
+.widget-pill.strong {
+  background: var(--widget-accent-soft);
+  color: var(--widget-accent);
+  border-color: transparent;
+}
+
+.price-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--widget-accent);
+  color: var(--widget-accent-ink);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.muted {
+  color: var(--widget-muted);
+}
+
+.soft {
+  color: var(--widget-soft-text);
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--widget-soft-text);
+}
+
+.product-hero {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.preview-stage {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  border-radius: 12px;
+  border: 1px solid var(--widget-card-border);
+  background: var(--widget-panel-muted);
+}
+
+.preview-stage img {
+  max-width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.16));
+}
+
+.sku-grid,
+.variant-grid,
+.cart-list {
+  display: grid;
+  gap: 12px;
+}
+
+.sku-chip {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--widget-panel-muted);
+  border: 1px solid var(--widget-card-border);
+  font-size: 12px;
+  color: var(--widget-muted);
+}
+
+.variant-row,
+.cart-row {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--widget-line);
+  background: var(--widget-panel);
+}
+
+.variant-row-main,
+.cart-row-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--widget-card-border);
+  font-size: 12px;
+  color: var(--widget-muted);
+}
+
+.swatch-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.meta-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.meta-block {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--widget-line);
+  background: var(--widget-panel);
+}
+
+.meta-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--widget-soft-text);
+}
+
+.meta-value {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.prompt-block {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--widget-line);
+  background: var(--widget-panel);
+  color: var(--widget-muted);
+  line-height: 1.55;
+}
+
+.design-thumb {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--widget-panel-muted);
+  border: 1px solid var(--widget-card-border);
+}
+
+.footer-note {
+  margin: 0;
+  color: var(--widget-muted);
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: "SFMono-Regular", "JetBrains Mono", "Menlo", monospace;
+}
+
+.pending-pulse {
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--widget-skeleton), var(--widget-skeleton-active), var(--widget-skeleton));
+  background-size: 200% 100%;
+  animation: widget-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes widget-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (min-width: 760px) {
+  .product-hero {
+    grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+    align-items: stretch;
+  }
+}

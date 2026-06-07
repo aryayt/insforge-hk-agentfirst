@@ -29,7 +29,7 @@ server.tool({
     "List products available to buy and customize (t-shirts, mugs, caps), with base prices and variant counts.",
   inputs: [],
   widget: {
-    name: "agent-shop",
+    name: "storefront",
     invoking: "Loading catalog...",
     invoked: "Catalog ready",
   },
@@ -41,7 +41,7 @@ server.tool({
         `• ${p.name} (${p.slug}): from ${money(p.basePriceCents)}, ${p.variants.length} variants`,
     );
     return widget({
-      props: { mode: "catalog", products },
+      props: { products },
       output: text(products.length ? `Available products:\n${lines.join("\n")}` : "No products available."),
     });
   },
@@ -60,6 +60,11 @@ server.tool({
       required: true,
     },
   ],
+  widget: {
+    name: "product-detail",
+    invoking: "Loading product details...",
+    invoked: "Product details ready",
+  },
   annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   cb: async ({ slug }: { slug: string }) => {
     const product = await getProduct(slug);
@@ -72,15 +77,12 @@ server.tool({
           v.priceDeltaCents ? ` +${money(v.priceDeltaCents)}` : ""
         }`,
     );
-    return {
-      content: [
-        {
-          type: "text",
-          text: `${product.name}: ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
-        },
-      ],
-      structuredContent: { product },
-    };
+    return widget({
+      props: { product },
+      output: text(
+        `${product.name}: ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
+      ),
+    });
   },
 });
 
@@ -117,7 +119,7 @@ server.tool({
     },
   ],
   widget: {
-    name: "agent-shop",
+    name: "design-preview",
     invoking: "Creating print artwork...",
     invoked: "Design ready",
   },
@@ -156,7 +158,6 @@ server.tool({
       session.designs.set(design.id, design);
       return widget({
         props: {
-          mode: "design",
           design,
           studioUrl: `${webBaseUrl}/design/classic-tee`,
         },
@@ -183,7 +184,7 @@ server.tool({
     },
   ],
   widget: {
-    name: "agent-shop",
+    name: "brand-kit",
     invoking: "Reading brand and creating merch concepts...",
     invoked: "Brand concepts ready",
   },
@@ -218,7 +219,6 @@ server.tool({
       const lines = designs.map((d) => `- ${d.label}: ${d.id}`).join("\n");
       return widget({
         props: {
-          mode: "brand",
           brand: result.brand ?? { name: url, domain: url, colors: [], logoUrl: null },
           designs,
           studioUrl: `${webBaseUrl}/`,
@@ -242,6 +242,11 @@ server.tool({
     { name: "designId", type: "string", description: "Optional design id to print on it.", required: false },
     { name: "qty", type: "number", description: "Quantity (default 1).", required: false },
   ],
+  widget: {
+    name: "cart-summary",
+    invoking: "Adding to cart...",
+    invoked: "Cart ready",
+  },
   annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: false },
   cb: async (
     { sku, designId, qty }: { sku: string; designId?: string; qty?: number },
@@ -267,15 +272,12 @@ server.tool({
         unitPriceCents: variant.unitPriceCents,
       });
       const total = cartTotalCents(session.cart);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Added ${quantity}x ${variant.productLabel}${design ? ` with design "${design.label}"` : ""}: ${money(variant.unitPriceCents)} each.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}). Use create_checkout when ready.`,
-          },
-        ],
-        structuredContent: { cart: session.cart, totalCents: total },
-      };
+      return widget({
+        props: { cart: session.cart, totalCents: total },
+        output: text(
+          `Added ${quantity}x ${variant.productLabel}${design ? ` with design "${design.label}"` : ""}: ${money(variant.unitPriceCents)} each.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}). Use create_checkout when ready.`,
+        ),
+      });
     } catch (e) {
       return fail(`add_to_cart failed: ${errMsg(e)}`);
     }
@@ -287,7 +289,7 @@ server.tool({
   description: "Show the current cart contents and total.",
   inputs: [],
   widget: {
-    name: "agent-shop",
+    name: "cart-summary",
     invoking: "Loading cart...",
     invoked: "Cart ready",
   },
@@ -296,7 +298,7 @@ server.tool({
     const session = getSession(sessionKey(ctx));
     if (session.cart.length === 0) {
       return widget({
-        props: { mode: "cart", cart: [], totalCents: 0 },
+        props: { cart: [], totalCents: 0 },
         output: text("Cart is empty. Use list_products to browse."),
       });
     }
@@ -306,7 +308,7 @@ server.tool({
     );
     const total = cartTotalCents(session.cart);
     return widget({
-      props: { mode: "cart", cart: session.cart, totalCents: total },
+      props: { cart: session.cart, totalCents: total },
       output: text(`Cart:\n${lines.join("\n")}\nTotal: ${money(total)}`),
     });
   },
@@ -324,21 +326,23 @@ server.tool({
       required: true,
     },
   ],
+  widget: {
+    name: "cart-summary",
+    invoking: "Removing from cart...",
+    invoked: "Cart ready",
+  },
   annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: true },
   cb: async ({ lineNumber }: { lineNumber: number }, ctx: unknown) => {
     const session = getSession(sessionKey(ctx));
     const removed = removeCartLine(session.cart, lineNumber);
     if (!removed) return fail(`No cart line ${lineNumber}. Run get_cart to see current line numbers.`);
     const total = cartTotalCents(session.cart);
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Removed ${removed.qty}x ${removed.productLabel}${removed.designLabel ? ` with design "${removed.designLabel}"` : ""}.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}).`,
-        },
-      ],
-      structuredContent: { removed, cart: session.cart, totalCents: total },
-    };
+    return widget({
+      props: { cart: session.cart, totalCents: total },
+      output: text(
+        `Removed ${removed.qty}x ${removed.productLabel}${removed.designLabel ? ` with design "${removed.designLabel}"` : ""}.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}).`,
+      ),
+    });
   },
 });
 
