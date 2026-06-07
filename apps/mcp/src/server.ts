@@ -8,6 +8,7 @@ import {
   markPaidFromSuccessRedirect,
 } from "./orders";
 import { callerInfo, cartTotalCents, getSession, removeCartLine, sessionKey } from "./session";
+import { admin } from "./insforge";
 
 const server = createMCPServer("agent-shop", {
   version: "0.1.0",
@@ -19,6 +20,7 @@ const server = createMCPServer("agent-shop", {
 });
 
 const money = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
+const webBaseUrl = process.env.WEB_PUBLIC_URL ?? process.env.APP_PUBLIC_URL ?? "https://app.agentfirst.shop";
 
 // ── list_products (read-only) ──────────────────────────────────────────────
 server.tool({
@@ -92,7 +94,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 server.tool({
   name: "create_design",
   description:
-    "Create print artwork for a product. Pass an imageUrl (e.g. an image the user already generated in this chat) OR a text prompt to generate artwork server-side. Stores the artwork durably and returns a design id + preview URL. Keep designs original: no brand logos or copyrighted characters.",
+    "Create print artwork for a product. Use this when the user wants custom merch artwork. Pass an imageUrl (existing image) OR a prompt to generate transparent-background print art server-side. Returns a design preview widget, design id, and URL. Keep designs original: no brand logos or copyrighted characters.",
   inputs: [
     {
       name: "prompt",
@@ -114,6 +116,11 @@ server.tool({
       required: false,
     },
   ],
+  widget: {
+    name: "agent-shop",
+    invoking: "Creating print artwork...",
+    invoked: "Design ready",
+  },
   annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
   cb: async (
     { prompt, imageUrl, label }: { prompt?: string; imageUrl?: string; label?: string },
@@ -147,17 +154,81 @@ server.tool({
         createdAt: Date.now(),
       };
       session.designs.set(design.id, design);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Design ready: "${design.label}"\nid: ${design.id}\npreview: ${design.imageUrl}\nUse add_to_cart with a variant SKU and this designId.`,
-          },
-        ],
-        structuredContent: { design },
-      };
+      return widget({
+        props: {
+          mode: "design",
+          design,
+          studioUrl: `${webBaseUrl}/design/classic-tee`,
+        },
+        output: text(
+          `Design ready: "${design.label}"\nid: ${design.id}\npreview: ${design.imageUrl}\nUse add_to_cart with a variant SKU and this designId. For precise placement, open the web studio: ${webBaseUrl}/design/classic-tee`,
+        ),
+      });
     } catch (e) {
       return fail(`create_design failed: ${errMsg(e)}`);
+    }
+  },
+});
+
+server.tool({
+  name: "analyze_brand",
+  description:
+    "Extract a company's public website brand signals (name, colors, logo) and create standalone transparent merch design concepts. Use this before create_design when the user provides a company domain or asks for branded event merch.",
+  inputs: [
+    {
+      name: "url",
+      type: "string",
+      description: "Company website or domain, e.g. lesearch.ai or https://example.com.",
+      required: true,
+    },
+  ],
+  widget: {
+    name: "agent-shop",
+    invoking: "Reading brand and creating merch concepts...",
+    invoked: "Brand concepts ready",
+  },
+  annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
+  cb: async ({ url }: { url: string }, ctx: unknown) => {
+    try {
+      const caller = callerInfo(ctx);
+      const session = getSession(caller.sessionKey);
+      const { data, error } = await admin.functions.invoke("brand-design", {
+        body: {
+          url,
+          sessionKey: caller.sessionKey,
+          agentSource: caller.agentSource,
+        },
+      });
+      if (error) throw error;
+      const result = data as {
+        brand?: { name: string; domain?: string; colors: string[]; logoUrl?: string | null };
+        designs?: Array<{ id: string; label: string; imageUrl: string; imageKey?: string }>;
+        error?: string;
+      };
+      if (!result.designs?.length) throw new Error(result.error ?? "No brand concepts were returned.");
+      const designs = result.designs.map((d) => ({
+        id: d.id,
+        label: d.label,
+        prompt: `Brand concept for ${result.brand?.domain ?? url}`,
+        imageUrl: d.imageUrl,
+        imageKey: d.imageKey ?? "",
+        createdAt: Date.now(),
+      }));
+      for (const design of designs) session.designs.set(design.id, design);
+      const lines = designs.map((d) => `- ${d.label}: ${d.id}`).join("\n");
+      return widget({
+        props: {
+          mode: "brand",
+          brand: result.brand ?? { name: url, domain: url, colors: [], logoUrl: null },
+          designs,
+          studioUrl: `${webBaseUrl}/`,
+        },
+        output: text(
+          `Brand concepts ready for ${result.brand?.name ?? url}.\n${lines}\nUse add_to_cart with one of these designId values and a variant SKU, or open the placement studio: ${webBaseUrl}/`,
+        ),
+      });
+    } catch (e) {
+      return fail(`analyze_brand failed: ${errMsg(e)}`);
     }
   },
 });

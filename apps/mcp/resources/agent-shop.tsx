@@ -42,6 +42,13 @@ const cartLineSchema = z.object({
   unitPriceCents: z.number(),
 });
 
+const designSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  imageUrl: z.string(),
+  prompt: z.string().optional(),
+});
+
 const propsSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("catalog"),
@@ -52,11 +59,27 @@ const propsSchema = z.discriminatedUnion("mode", [
     cart: z.array(cartLineSchema),
     totalCents: z.number(),
   }),
+  z.object({
+    mode: z.literal("design"),
+    design: designSchema,
+    studioUrl: z.string().optional(),
+  }),
+  z.object({
+    mode: z.literal("brand"),
+    brand: z.object({
+      name: z.string(),
+      domain: z.string().optional(),
+      colors: z.array(z.string()),
+      logoUrl: z.string().nullable().optional(),
+    }),
+    designs: z.array(designSchema),
+    studioUrl: z.string().optional(),
+  }),
 ]);
 
 export const widgetMetadata: WidgetMetadata = {
   title: "Agent Shop",
-  description: "Browse products and review the current cart for the agent-first shop.",
+  description: "Browse products, preview generated designs, and review the current cart for the agent-first shop.",
   props: propsSchema,
   exposeAsTool: false,
   metadata: {
@@ -65,7 +88,7 @@ export const widgetMetadata: WidgetMetadata = {
     widgetDescription:
       "Shows the current Agent Shop catalog or cart. Products include slugs and SKUs the model can use in follow-up tool calls.",
     csp: {
-      resourceDomains: ["https://dsc7y62h.us-east.insforge.app"],
+      resourceDomains: ["https://dsc7y62h.us-east.insforge.app", "https://app.agentfirst.shop"],
     },
   },
 };
@@ -123,6 +146,8 @@ export default function AgentShopWidget() {
   const summary = useMemo(() => {
     const data = props as Props;
     if (data.mode === "catalog") return `${data.products.length} products visible`;
+    if (data.mode === "design") return `Design ${data.design.label} visible`;
+    if (data.mode === "brand") return `Brand ${data.brand.name}, ${data.designs.length} designs visible`;
     return `${data.cart.length} cart lines, ${money(data.totalCents)} total`;
   }, [props]);
 
@@ -151,9 +176,11 @@ export default function AgentShopWidget() {
           <header className="top">
             <div>
               <p className="label">Agent Shop</p>
-              <h2>{data.mode === "catalog" ? "Catalog" : "Cart"}</h2>
+              <h2>{data.mode === "catalog" ? "Catalog" : data.mode === "design" ? "Design ready" : data.mode === "brand" ? "Brand kit" : "Cart"}</h2>
             </div>
-            <span className="status">{data.mode === "catalog" ? `${data.products.length} items` : money(data.totalCents)}</span>
+            <span className="status">
+              {data.mode === "catalog" ? `${data.products.length} items` : data.mode === "design" ? "print art" : data.mode === "brand" ? `${data.designs.length} concepts` : money(data.totalCents)}
+            </span>
           </header>
 
           {data.mode === "catalog" ? (
@@ -174,6 +201,59 @@ export default function AgentShopWidget() {
                   </div>
                 </article>
               ))}
+            </div>
+          ) : data.mode === "design" ? (
+            <article className="design-ready">
+              <div className="design-preview">
+                <img src={data.design.imageUrl} alt={data.design.label} />
+              </div>
+              <div className="design-copy">
+                <h3>{data.design.label}</h3>
+                {data.design.prompt && <p>{data.design.prompt}</p>}
+                <div className="chips">
+                  <span>designId: {data.design.id}</span>
+                  <span>transparent-ready</span>
+                </div>
+                {data.studioUrl && (
+                  <a href={data.studioUrl} target="_blank" rel="noreferrer">
+                    Open web studio
+                  </a>
+                )}
+              </div>
+            </article>
+          ) : data.mode === "brand" ? (
+            <div className="brand-mode">
+              <article className="brand-summary">
+                <div>
+                  <h3>{data.brand.name}</h3>
+                  <p>{data.brand.domain ?? "Brand domain"}</p>
+                </div>
+                <div className="swatches" aria-label="Extracted brand colors">
+                  {data.brand.colors.slice(0, 5).map((color) => (
+                    <span key={color} title={color} style={{ background: color }} />
+                  ))}
+                </div>
+              </article>
+              <div className="brand-designs">
+                {data.designs.map((design) => (
+                  <article className="brand-design" key={design.id}>
+                    <div className="design-preview compact">
+                      <img src={design.imageUrl} alt={design.label} />
+                    </div>
+                    <div className="design-copy">
+                      <h3>{design.label}</h3>
+                      <div className="chips">
+                        <span>designId: {design.id}</span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {data.studioUrl && (
+                <a className="studio-link" href={data.studioUrl} target="_blank" rel="noreferrer">
+                  Open placement studio
+                </a>
+              )}
             </div>
           ) : data.cart.length === 0 ? (
             <div className="empty">
@@ -273,7 +353,7 @@ function Styles() {
       .grid {
         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       }
-      .item, .cart-line, .empty {
+      .item, .cart-line, .empty, .design-ready {
         border: 1px solid var(--line, #d9ded8);
         border-radius: 8px;
         background: var(--panel, #fffdf8);
@@ -334,6 +414,49 @@ function Styles() {
         gap: 12px;
         padding: 12px;
       }
+      .design-ready {
+        display: grid;
+        grid-template-columns: minmax(120px, 220px) minmax(0, 1fr);
+        gap: 14px;
+        padding: 14px;
+      }
+      .design-preview {
+        display: grid;
+        place-items: center;
+        min-height: 160px;
+        border-radius: 8px;
+        border: 1px solid var(--line, #d9ded8);
+        background:
+          linear-gradient(45deg, var(--panel-alt, #edf1ed) 25%, transparent 25%),
+          linear-gradient(-45deg, var(--panel-alt, #edf1ed) 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, var(--panel-alt, #edf1ed) 75%),
+          linear-gradient(-45deg, transparent 75%, var(--panel-alt, #edf1ed) 75%);
+        background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+        background-size: 16px 16px;
+      }
+      .design-preview img {
+        max-width: 86%;
+        max-height: 180px;
+        object-fit: contain;
+      }
+      .design-copy {
+        display: grid;
+        align-content: center;
+        gap: 10px;
+      }
+      .design-copy a {
+        display: inline-flex;
+        width: fit-content;
+        min-height: 38px;
+        align-items: center;
+        border-radius: 6px;
+        background: var(--accent, #1d7f58);
+        color: var(--accent-ink, #ffffff);
+        padding: 0 12px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 800;
+      }
       .cart-line img {
         width: 52px;
         height: 52px;
@@ -341,6 +464,63 @@ function Styles() {
         border: 1px solid var(--line, #d9ded8);
         border-radius: 8px;
         background: var(--panel-alt, #edf1ed);
+      }
+      .brand-mode {
+        display: grid;
+        gap: 10px;
+      }
+      .brand-summary, .brand-design {
+        border: 1px solid var(--line, #d9ded8);
+        border-radius: 8px;
+        background: var(--panel, #fffdf8);
+      }
+      .brand-summary {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+      }
+      .swatches {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 6px;
+      }
+      .swatches span {
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--line, #d9ded8);
+        border-radius: 999px;
+      }
+      .brand-designs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 10px;
+      }
+      .brand-design {
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+      }
+      .design-preview.compact {
+        min-height: 120px;
+      }
+      .design-preview.compact img {
+        max-height: 126px;
+      }
+      .studio-link {
+        display: inline-flex;
+        min-height: 38px;
+        width: fit-content;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        background: var(--accent, #1d7f58);
+        color: var(--accent-ink, #ffffff);
+        padding: 0 12px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 800;
       }
       button {
         min-height: 38px;
@@ -382,6 +562,9 @@ function Styles() {
         .item { grid-template-columns: 60px minmax(0, 1fr); }
         .cart-line {
           grid-template-columns: 48px minmax(0, 1fr);
+        }
+        .design-ready {
+          grid-template-columns: 1fr;
         }
         .cart-line button {
           grid-column: 1 / -1;
