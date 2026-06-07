@@ -73,17 +73,18 @@ export function App() {
   const [shirtColor, setShirtColor] = useState<ShirtColor>("white");
   const [size, setSize] = useState<Size>("M");
   const [qty, setQty] = useState(1);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("demo@agentfirst.shop");
 
-  // shipping (required for fulfillment)
+  // shipping — pre-filled with a demo recipient so checkout flows straight through
+  // (the buyer can overwrite any field for a real order; agents never stall on blanks).
   const [ship, setShip] = useState({
-    name: "",
-    address1: "",
+    name: "Demo Buyer",
+    address1: "1 Market St",
     address2: "",
-    city: "",
-    state: "",
+    city: "San Francisco",
+    state: "CA",
     country: "US",
-    zip: "",
+    zip: "94105",
   });
   const setShipField = (k: keyof typeof ship) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setShip((s) => ({ ...s, [k]: e.target.value }));
