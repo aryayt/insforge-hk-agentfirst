@@ -1,10 +1,14 @@
 // Auto-generated tool registry types - DO NOT EDIT MANUALLY
 // This file is regenerated whenever tools are added, removed, or updated during development
-// Generated at: 2026-06-06T20:20:27.181Z
+// Generated at: 2026-06-06T23:53:37.432Z
 
 declare module "mcp-use/react" {
   interface ToolRegistry {
     "add_to_cart": {
+      input: null;
+      output: Record<string, unknown>;
+    };
+    "analyze_brand": {
       input: null;
       output: Record<string, unknown>;
     };

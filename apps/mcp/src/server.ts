@@ -8,6 +8,7 @@ import {
   markPaidFromSuccessRedirect,
 } from "./orders";
 import { callerInfo, cartTotalCents, getSession, removeCartLine, sessionKey } from "./session";
+import { admin } from "./insforge";
 
 const server = createMCPServer("agent-shop", {
   version: "0.1.0",
@@ -19,6 +20,7 @@ const server = createMCPServer("agent-shop", {
 });
 
 const money = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
+const webBaseUrl = process.env.WEB_PUBLIC_URL ?? process.env.APP_PUBLIC_URL ?? "https://app.agentfirst.shop";
 
 // ── list_products (read-only) ──────────────────────────────────────────────
 server.tool({
@@ -27,7 +29,7 @@ server.tool({
     "List products available to buy and customize (t-shirts, mugs, caps), with base prices and variant counts.",
   inputs: [],
   widget: {
-    name: "agent-shop",
+    name: "storefront",
     invoking: "Loading catalog...",
     invoked: "Catalog ready",
   },
@@ -39,7 +41,7 @@ server.tool({
         `• ${p.name} (${p.slug}): from ${money(p.basePriceCents)}, ${p.variants.length} variants`,
     );
     return widget({
-      props: { mode: "catalog", products },
+      props: { products },
       output: text(products.length ? `Available products:\n${lines.join("\n")}` : "No products available."),
     });
   },
@@ -58,6 +60,11 @@ server.tool({
       required: true,
     },
   ],
+  widget: {
+    name: "product-detail",
+    invoking: "Loading product details...",
+    invoked: "Product details ready",
+  },
   annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
   cb: async ({ slug }: { slug: string }) => {
     const product = await getProduct(slug);
@@ -70,15 +77,12 @@ server.tool({
           v.priceDeltaCents ? ` +${money(v.priceDeltaCents)}` : ""
         }`,
     );
-    return {
-      content: [
-        {
-          type: "text",
-          text: `${product.name}: ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
-        },
-      ],
-      structuredContent: { product },
-    };
+    return widget({
+      props: { product },
+      output: text(
+        `${product.name}: ${money(product.basePriceCents)}\n${product.description}\nVariants:\n${variantLines.join("\n")}`,
+      ),
+    });
   },
 });
 
@@ -92,7 +96,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 server.tool({
   name: "create_design",
   description:
-    "Create print artwork for a product. Pass an imageUrl (e.g. an image the user already generated in this chat) OR a text prompt to generate artwork server-side. Stores the artwork durably and returns a design id + preview URL. Keep designs original: no brand logos or copyrighted characters.",
+    "Create print artwork for a product. Use this when the user wants custom merch artwork. Pass an imageUrl (existing image) OR a prompt to generate transparent-background print art server-side. Returns a design preview widget, design id, and URL. Keep designs original: no brand logos or copyrighted characters.",
   inputs: [
     {
       name: "prompt",
@@ -114,6 +118,11 @@ server.tool({
       required: false,
     },
   ],
+  widget: {
+    name: "design-preview",
+    invoking: "Creating print artwork...",
+    invoked: "Design ready",
+  },
   annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
   cb: async (
     { prompt, imageUrl, label }: { prompt?: string; imageUrl?: string; label?: string },
@@ -147,17 +156,79 @@ server.tool({
         createdAt: Date.now(),
       };
       session.designs.set(design.id, design);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Design ready: "${design.label}"\nid: ${design.id}\npreview: ${design.imageUrl}\nUse add_to_cart with a variant SKU and this designId.`,
-          },
-        ],
-        structuredContent: { design },
-      };
+      return widget({
+        props: {
+          design,
+          studioUrl: `${webBaseUrl}/design/classic-tee`,
+        },
+        output: text(
+          `Design ready: "${design.label}"\nid: ${design.id}\npreview: ${design.imageUrl}\nUse add_to_cart with a variant SKU and this designId. For precise placement, open the web studio: ${webBaseUrl}/design/classic-tee`,
+        ),
+      });
     } catch (e) {
       return fail(`create_design failed: ${errMsg(e)}`);
+    }
+  },
+});
+
+server.tool({
+  name: "analyze_brand",
+  description:
+    "Extract a company's public website brand signals (name, colors, logo) and create standalone transparent merch design concepts. Use this before create_design when the user provides a company domain or asks for branded event merch.",
+  inputs: [
+    {
+      name: "url",
+      type: "string",
+      description: "Company website or domain, e.g. lesearch.ai or https://example.com.",
+      required: true,
+    },
+  ],
+  widget: {
+    name: "brand-kit",
+    invoking: "Reading brand and creating merch concepts...",
+    invoked: "Brand concepts ready",
+  },
+  annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
+  cb: async ({ url }: { url: string }, ctx: unknown) => {
+    try {
+      const caller = callerInfo(ctx);
+      const session = getSession(caller.sessionKey);
+      const { data, error } = await admin.functions.invoke("brand-design", {
+        body: {
+          url,
+          sessionKey: caller.sessionKey,
+          agentSource: caller.agentSource,
+        },
+      });
+      if (error) throw error;
+      const result = data as {
+        brand?: { name: string; domain?: string; colors: string[]; logoUrl?: string | null };
+        designs?: Array<{ id: string; label: string; imageUrl: string; imageKey?: string }>;
+        error?: string;
+      };
+      if (!result.designs?.length) throw new Error(result.error ?? "No brand concepts were returned.");
+      const designs = result.designs.map((d) => ({
+        id: d.id,
+        label: d.label,
+        prompt: `Brand concept for ${result.brand?.domain ?? url}`,
+        imageUrl: d.imageUrl,
+        imageKey: d.imageKey ?? "",
+        createdAt: Date.now(),
+      }));
+      for (const design of designs) session.designs.set(design.id, design);
+      const lines = designs.map((d) => `- ${d.label}: ${d.id}`).join("\n");
+      return widget({
+        props: {
+          brand: result.brand ?? { name: url, domain: url, colors: [], logoUrl: null },
+          designs,
+          studioUrl: `${webBaseUrl}/`,
+        },
+        output: text(
+          `Brand concepts ready for ${result.brand?.name ?? url}.\n${lines}\nUse add_to_cart with one of these designId values and a variant SKU, or open the placement studio: ${webBaseUrl}/`,
+        ),
+      });
+    } catch (e) {
+      return fail(`analyze_brand failed: ${errMsg(e)}`);
     }
   },
 });
@@ -171,6 +242,11 @@ server.tool({
     { name: "designId", type: "string", description: "Optional design id to print on it.", required: false },
     { name: "qty", type: "number", description: "Quantity (default 1).", required: false },
   ],
+  widget: {
+    name: "cart-summary",
+    invoking: "Adding to cart...",
+    invoked: "Cart ready",
+  },
   annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: false },
   cb: async (
     { sku, designId, qty }: { sku: string; designId?: string; qty?: number },
@@ -196,15 +272,12 @@ server.tool({
         unitPriceCents: variant.unitPriceCents,
       });
       const total = cartTotalCents(session.cart);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Added ${quantity}x ${variant.productLabel}${design ? ` with design "${design.label}"` : ""}: ${money(variant.unitPriceCents)} each.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}). Use create_checkout when ready.`,
-          },
-        ],
-        structuredContent: { cart: session.cart, totalCents: total },
-      };
+      return widget({
+        props: { cart: session.cart, totalCents: total },
+        output: text(
+          `Added ${quantity}x ${variant.productLabel}${design ? ` with design "${design.label}"` : ""}: ${money(variant.unitPriceCents)} each.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}). Use create_checkout when ready.`,
+        ),
+      });
     } catch (e) {
       return fail(`add_to_cart failed: ${errMsg(e)}`);
     }
@@ -216,7 +289,7 @@ server.tool({
   description: "Show the current cart contents and total.",
   inputs: [],
   widget: {
-    name: "agent-shop",
+    name: "cart-summary",
     invoking: "Loading cart...",
     invoked: "Cart ready",
   },
@@ -225,7 +298,7 @@ server.tool({
     const session = getSession(sessionKey(ctx));
     if (session.cart.length === 0) {
       return widget({
-        props: { mode: "cart", cart: [], totalCents: 0 },
+        props: { cart: [], totalCents: 0 },
         output: text("Cart is empty. Use list_products to browse."),
       });
     }
@@ -235,7 +308,7 @@ server.tool({
     );
     const total = cartTotalCents(session.cart);
     return widget({
-      props: { mode: "cart", cart: session.cart, totalCents: total },
+      props: { cart: session.cart, totalCents: total },
       output: text(`Cart:\n${lines.join("\n")}\nTotal: ${money(total)}`),
     });
   },
@@ -253,21 +326,23 @@ server.tool({
       required: true,
     },
   ],
+  widget: {
+    name: "cart-summary",
+    invoking: "Removing from cart...",
+    invoked: "Cart ready",
+  },
   annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: true },
   cb: async ({ lineNumber }: { lineNumber: number }, ctx: unknown) => {
     const session = getSession(sessionKey(ctx));
     const removed = removeCartLine(session.cart, lineNumber);
     if (!removed) return fail(`No cart line ${lineNumber}. Run get_cart to see current line numbers.`);
     const total = cartTotalCents(session.cart);
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Removed ${removed.qty}x ${removed.productLabel}${removed.designLabel ? ` with design "${removed.designLabel}"` : ""}.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}).`,
-        },
-      ],
-      structuredContent: { removed, cart: session.cart, totalCents: total },
-    };
+    return widget({
+      props: { cart: session.cart, totalCents: total },
+      output: text(
+        `Removed ${removed.qty}x ${removed.productLabel}${removed.designLabel ? ` with design "${removed.designLabel}"` : ""}.\nCart total: ${money(total)} (${session.cart.length} line${session.cart.length === 1 ? "" : "s"}).`,
+      ),
+    });
   },
 });
 

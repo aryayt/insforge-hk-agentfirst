@@ -65,8 +65,10 @@ bunx @insforge/cli compute update <service-id> --env-set MCP_PUBLIC_URL=https://
 Settings → Apps & Connectors → Advanced → Developer mode on, then Create:
 
 - Name: **AgentFirst Merch (Test)**
-- MCP Server URL: `https://<endpoint>/mcp`
+- MCP Server URL: `https://app.agentfirst.shop/mcp`
 - Authentication: **No Auth** (private dev connector; OAuth is the v1 path)
+
+Use `https://app.agentfirst.shop/mcp`, not `https://mcp.agentfirst.shop/mcp`. The `mcp` subdomain still points directly at Fly and fails TLS until it is moved behind the Vercel proxy or configured with a Fly custom certificate.
 
 ## 6. Demo prompts
 
@@ -74,6 +76,14 @@ Settings → Apps & Connectors → Advanced → Developer mode on, then Create:
 Use AgentFirst Merch: design a black classic tee for "AstroAttire Orbit Club" —
 retro space startup, moon base, clean vector art. Size L, qty 1. Show me the
 design, add it to my cart, and give me a checkout link.
+```
+
+Brand-from-domain path:
+
+```text
+Use AgentFirst Merch. I have a brand called LeSearch AI at lesearch.ai and an event next week.
+Extract the brand, show me merch concepts, choose the strongest black Classic Tee design in size L,
+add it to my cart, and give me a checkout link.
 ```
 
 Guardrail check (should be redirected to an original design):

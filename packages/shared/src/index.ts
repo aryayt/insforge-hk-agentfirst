@@ -4,5 +4,7 @@
  */
 export * from "./catalog";
 export * from "./design";
+export * from "./print";
+export * from "./mockup";
 export * from "./cart";
 export * from "./order";

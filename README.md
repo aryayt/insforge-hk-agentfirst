@@ -8,13 +8,13 @@
 
 > AI agents working in this repo: read **AGENTS.md** first.
 
-## What works today (branch `feat/web-storefront`)
+## What works today (branch `integrate/design-studio`)
 
 | Surface | Flow | Status |
 |---|---|---|
-| MCP (ChatGPT) | `list_products` widget -> `get_product` -> `create_design` (image import or AI prompt) -> `add_to_cart` -> `get_cart` widget -> `remove_from_cart` if needed -> `create_checkout` (Stripe test) -> `get_order_status` | ✅ full loop + widget |
-| Web | browse -> design studio (text/preset/upload/AI art) -> cart -> anonymous Stripe checkout -> orders + `/data` live DB view | ✅ full loop |
-| Backend | catalog + guest orders + persisted designs + Stripe test prices + agent attribution + AI `generate-design` function | ✅ after migrations |
+| MCP (ChatGPT) | `list_products` storefront widget -> `get_product` detail widget -> `analyze_brand` brand-kit widget or `create_design` design-preview widget -> `add_to_cart` / `get_cart` cart widget -> `remove_from_cart` if needed -> `create_checkout` (Stripe test) -> `get_order_status` | ✅ full loop + 5 widgets |
+| Web | company URL -> brand colors/logo/concepts -> photoreal tee placement -> transparent print file -> signed-in Stripe checkout -> order status | ✅ full loop |
+| Backend | catalog + persisted designs + Stripe test prices + agent attribution + AI `generate-design` + URL-to-brand `brand-design` + Printful function path | ✅ migrations current |
 
 > **Demo pricing:** the Classic Tee is set to a flat **$2.00** (all variants) so live test payments feel real without feeling expensive — see `scripts/seed/demo-pricing.ts`. (InsForge's checkout schema has no promo-code field, so the discount is baked into the Stripe price rather than applied via a coupon.)
 
@@ -24,7 +24,7 @@ Every order records **who and which agent** bought it: `orders.agent_source` (`o
 
 ```bash
 git clone git@github.com:aryayt/insforge-hk-agentfirst.git && cd insforge-hk-agentfirst
-git checkout feat/web-storefront
+git checkout integrate/design-studio
 
 bun install
 bunx @insforge/cli link --project-id 787adbc2-92c6-4b37-a0a9-3e8d94123584
@@ -41,10 +41,12 @@ bun run web:dev    # storefront  → http://localhost:5173
 
 **Teammates need NO local API keys.** Everything lives as InsForge secrets (dashboard → Functions → Secrets): `GOOGLE_AI_API_KEY`, `OPENAI_API_KEY`, Stripe test keys — already set. AI image generation runs through the `generate-design` edge function which reads those secrets server-side.
 
-One-time (already done if `bunx @insforge/cli functions list` shows it active):
+One-time (already done if `bunx @insforge/cli functions list` shows them active):
 
 ```bash
 bunx @insforge/cli functions deploy generate-design --file functions/generate-design.ts
+bunx @insforge/cli functions deploy brand-design --file functions/brand-design.ts
+bunx @insforge/cli functions deploy create-checkout --file functions/create-checkout.ts
 ```
 
 Optional local-only fallback: `OPENROUTER_API_KEY` in `.env.local` (used only if the edge function is unreachable). Never commit keys.
@@ -78,6 +80,23 @@ MCP loop in the inspector (`http://localhost:8788/inspector`):
 
 See **[docs/DEPLOY.md](./docs/DEPLOY.md)** and **[docs/RUNBOOK-demo.md](./docs/RUNBOOK-demo.md)**. Current live connector URL: `https://app.agentfirst.shop/mcp` (Developer mode, No Auth). Direct compute URL: `https://agent-shop-mcp-787adbc2-92c6-4b37-a0a9-3e8d94123584.fly.dev/mcp`.
 
+## Connect to Codex
+
+Codex can connect to the same remote streamable HTTP MCP server:
+
+```bash
+codex mcp add agent-shop --url https://app.agentfirst.shop/mcp
+```
+
+Equivalent `~/.codex/config.toml` entry:
+
+```toml
+[mcp_servers.agent-shop]
+url = "https://app.agentfirst.shop/mcp"
+```
+
+Use `https://app.agentfirst.shop/mcp` until `mcp.agentfirst.shop` is moved to the Vercel proxy and has a valid certificate.
+
 ## Repo map
 
 ```
@@ -105,9 +124,9 @@ skills/          Vendored agent skills (InsForge, mcp-use app builders, Impeccab
 
 ## Roadmap (GitHub issues)
 
-#1 MCP Apps-SDK widgets: catalog/cart done, design widget still open · ~~#2 AI design edge function~~ ✅ done · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment (replace success-redirect paid-marking) · #5 production deploy.
+#1 MCP Apps-SDK widgets: storefront/product/design/brand/cart done · ~~#2 AI design edge function~~ ✅ done · #3 MCP OAuth (real users instead of guest) · #4 webhook-backed fulfillment hardening · #5 production deploy.
 
-Next UX work queued behind those: show the print placement zone on the product preview, real image upload to Storage from the web studio, lightweight background-removal for uploaded art.
+Current UX direction: the web app owns the detailed design studio because it has enough room for brand intake, drag placement, scaling, background cleanup, Printful mockups, and print-file preview. The ChatGPT app stays compact but visual: product browsing, product detail, URL-to-brand concepts, generated-design previews, and cart review, with deep links into the web studio rather than a full desktop editor inside the chat pane.
 
 ## Team
 

@@ -19,6 +19,7 @@ type VariantRow = {
   sku: string;
   price_delta_cents: number;
   stripe_price_id: string | null;
+  printful_variant_id: number | null;
 };
 
 function toVariant(r: VariantRow): Variant {
@@ -30,6 +31,7 @@ function toVariant(r: VariantRow): Variant {
     sku: r.sku,
     priceDeltaCents: r.price_delta_cents,
     stripePriceId: r.stripe_price_id,
+    printfulVariantId: r.printful_variant_id ?? null,
   };
 }
 
