@@ -267,10 +267,73 @@ function brandConcepts(brand: Brand): Concept[] {
   ];
 }
 
+// OpenRouter (InsForge Model Gateway) concept generation — tried before the
+// direct Gemini key since the gateway carries the project's funded credits.
+// Set OPENROUTER_API_KEY as a function secret (dashboard → Model Gateway, or
+// `insforge ai setup`).
+async function generateConceptOpenRouter(
+  prompt: string,
+  logoRef: { bytes: Uint8Array; contentType: string } | null,
+): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) return null;
+  const model = Deno.env.get("OPENROUTER_IMAGE_MODEL") ?? "google/gemini-3.1-flash-image-preview";
+  const canRef = !!logoRef && /^image\/(png|jpe?g|webp)$/i.test(logoRef.contentType);
+  const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
+  if (canRef && logoRef) {
+    content.push(
+      {
+        type: "text",
+        text: "Reference: the brand's current logo. Reinterpret its character — do not copy it pixel-for-pixel.",
+      },
+      {
+        type: "image_url",
+        image_url: { url: `data:${logoRef.contentType};base64,${bytesToB64(logoRef.bytes)}` },
+      },
+    );
+  }
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        modalities: ["image", "text"],
+        messages: [{ role: "user", content }],
+        image_config: { aspect_ratio: "3:4" },
+      }),
+    });
+    if (!res.ok) {
+      console.error("brand openrouter error", res.status, (await res.text()).slice(0, 200));
+      return null;
+    }
+    const out = await res.json();
+    const url: string | undefined = out?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    if (!url) return null;
+    if (url.startsWith("data:")) {
+      const comma = url.indexOf(",");
+      if (comma === -1) return null;
+      const mime = url.slice(5, url.indexOf(";")) || "image/png";
+      return { bytes: b64ToBytes(url.slice(comma + 1)), mime };
+    }
+    const imgRes = await fetch(url);
+    if (!imgRes.ok) return null;
+    return {
+      bytes: new Uint8Array(await imgRes.arrayBuffer()),
+      mime: imgRes.headers.get("content-type") ?? "image/png",
+    };
+  } catch (e) {
+    console.error("brand openrouter failed", e);
+    return null;
+  }
+}
+
 async function generateConcept(
   prompt: string,
   logoRef: { bytes: Uint8Array; contentType: string } | null,
 ): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const viaGateway = await generateConceptOpenRouter(prompt, logoRef);
+  if (viaGateway) return viaGateway;
   const key = Deno.env.get("GOOGLE_AI_API_KEY");
   if (!key) return null;
   const model = Deno.env.get("GOOGLE_IMAGE_MODEL") ?? "gemini-3.1-flash-image-preview";
