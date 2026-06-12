@@ -138,6 +138,21 @@ function buildPrompt(prompt: string, aspectRatio: string, transparent: boolean):
   );
 }
 
+// Quote/slogan merch: unlike general artwork (where stray text is a defect),
+// the text IS the design. Tuned so the lockup reads on both black and white
+// garments after white-key background removal.
+function buildQuotePrompt(prompt: string, aspectRatio: string): string {
+  return (
+    `Original, standalone print-ready TYPOGRAPHIC merch artwork — no t-shirt, no apparel, no product mockup, no photo, no watermark, no brand logos. ` +
+    `Design a beautiful quote lockup: expressive display typography with clear hierarchy, optional small flourishes (thin rules, stars, laurels), flat vector style. ` +
+    `Render the quote text EXACTLY as written, spelled correctly, as the hero of the composition. ` +
+    `Use one to three saturated ink colors with strong contrast. CRITICAL: the design must read perfectly printed on either a BLACK or a WHITE garment — avoid pure-white fills and large pure-black areas; prefer bold saturated or mid-tone colors, or letterforms with contrasting outlines. ` +
+    `Place the lockup centered on a perfectly FLAT solid pure-white (#FFFFFF) background that fills the entire canvas edge-to-edge — no card, frame, border, drop shadow, checkerboard, gradient, or texture. ` +
+    `Composition aspect ratio approximately ${aspectRatio}. ` +
+    `Quote and art direction: ${prompt}`
+  );
+}
+
 function openAiSize(aspectRatio: string): string {
   const [w, h] = aspectRatio.split(":").map(Number);
   if (!w || !h || w === h) return "1024x1024";
@@ -149,6 +164,61 @@ function openAiSize(aspectRatio: string): string {
 // (bad key, model outage). `blocked` means the provider's safety system refused.
 type GenAttempt = { bytes: Uint8Array | null; blocked?: boolean; reason?: string };
 const SAFETY_FINISH = /SAFETY|PROHIBIT|BLOCK|SPII|RECITATION/i;
+
+// ── OpenRouter (InsForge Model Gateway) ──────────────────────────────────────
+// Primary path: the project's InsForge-provisioned OpenRouter key (set
+// OPENROUTER_API_KEY as a function secret; fetch it with `insforge ai setup`
+// or copy it from dashboard → Model Gateway). Image models are invoked via
+// chat completions with image output modalities; the image comes back as a
+// data: URL (or occasionally a transfer URL) in message.images.
+async function imageUrlToBytes(url: string): Promise<Uint8Array | null> {
+  if (url.startsWith("data:")) {
+    const comma = url.indexOf(",");
+    if (comma === -1) return null;
+    return b64ToBytes(url.slice(comma + 1));
+  }
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+async function generateWithOpenRouter(prompt: string, aspectRatio: string): Promise<GenAttempt> {
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) return { bytes: null };
+  const model = Deno.env.get("OPENROUTER_IMAGE_MODEL") ?? "google/gemini-3.1-flash-image-preview";
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      modalities: ["image", "text"],
+      messages: [{ role: "user", content: prompt }],
+      image_config: { aspect_ratio: aspectRatio },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("openrouter error", res.status, text.slice(0, 300));
+    if (res.status === 403 || /moderation|flagged|safety/i.test(text)) {
+      return { bytes: null, blocked: true, reason: "OpenRouter moderation" };
+    }
+    return { bytes: null };
+  }
+  const out = await res.json();
+  const choice = out?.choices?.[0];
+  const url: string | undefined = choice?.message?.images?.[0]?.image_url?.url;
+  if (url) {
+    const bytes = await imageUrlToBytes(url);
+    if (bytes) return { bytes };
+  }
+  const finish: string | undefined = choice?.finish_reason ?? choice?.native_finish_reason;
+  if (finish && SAFETY_FINISH.test(finish)) {
+    console.error("openrouter declined", finish);
+    return { bytes: null, blocked: true, reason: `OpenRouter: ${finish}` };
+  }
+  console.error("openrouter no image", finish ?? "(none)");
+  return { bytes: null };
+}
 
 async function generateWithGemini(prompt: string): Promise<GenAttempt> {
   const key = Deno.env.get("GOOGLE_AI_API_KEY");
@@ -231,6 +301,8 @@ export default async function (req: Request): Promise<Response> {
     source?: "ai" | "upload" | "preset";
     aspectRatio?: string;
     transparent?: boolean;
+    /** "quote" → typographic lockup template (text is the design); "auto" detects quotation marks. */
+    style?: "auto" | "quote";
     label?: string;
     sessionKey?: string;
     agentSource?: string;
@@ -256,19 +328,30 @@ export default async function (req: Request): Promise<Response> {
     if (!verdict.ok)
       return json(422, { error: verdict.reason, message: verdict.reason, moderation: true });
 
-    const shaped = buildPrompt(prompt, aspectRatio, transparent);
-    // Primary (Gemini) → fallback (OpenAI). Track whether *either* provider
-    // refused on safety grounds so we can report a content block distinctly.
-    const primary = await generateWithGemini(shaped);
-    let blocked = primary.blocked;
-    let blockReason = primary.reason;
-    bytes = primary.bytes;
-    if (!bytes) {
-      const fallback = await generateWithOpenAI(shaped, openAiSize(aspectRatio));
-      bytes = fallback.bytes;
-      if (fallback.blocked) {
+    const style = body.style ?? "auto";
+    const isQuote = style === "quote" || (style === "auto" && /["“”]/.test(prompt));
+    const shaped = isQuote
+      ? buildQuotePrompt(prompt, aspectRatio)
+      : buildPrompt(prompt, aspectRatio, transparent);
+    // Provider chain: OpenRouter (InsForge Model Gateway — funded credits) →
+    // Gemini direct → OpenAI. Track whether *any* provider refused on safety
+    // grounds so we can report a content block distinctly from an infra failure.
+    let blocked: boolean | undefined;
+    let blockReason: string | undefined;
+    const attempts = [
+      () => generateWithOpenRouter(shaped, aspectRatio),
+      () => generateWithGemini(shaped),
+      () => generateWithOpenAI(shaped, openAiSize(aspectRatio)),
+    ];
+    for (const attempt of attempts) {
+      const result = await attempt();
+      if (result.blocked) {
         blocked = true;
-        blockReason = fallback.reason;
+        blockReason = result.reason;
+      }
+      if (result.bytes) {
+        bytes = result.bytes;
+        break;
       }
     }
     if (!bytes) {
@@ -279,7 +362,7 @@ export default async function (req: Request): Promise<Response> {
         return json(422, { error: message, message, moderation: true, reason: blockReason });
       }
       const message =
-        "Image generation failed — check GOOGLE_AI_API_KEY / OPENAI_API_KEY secrets and function logs.";
+        "Image generation failed — check OPENROUTER_API_KEY / GOOGLE_AI_API_KEY / OPENAI_API_KEY secrets and function logs.";
       return json(502, { error: message, message });
     }
   } else {
@@ -333,3 +416,4 @@ export default async function (req: Request): Promise<Response> {
     design: { id: row?.id, label, imageUrl: up.url, imageKey: up.key },
   });
 }
+
