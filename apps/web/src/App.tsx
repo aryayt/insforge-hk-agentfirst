@@ -39,7 +39,14 @@ const EXAMPLES = [
   "bold koi fish, japanese woodblock",
 ];
 
-const checkoutParam = new URLSearchParams(window.location.search).get("checkout");
+// Two checkout-return URL shapes land here: the web flow's query form
+// (?checkout=success&order=...) and the MCP server's Stripe redirect path form
+// (/checkout/success?order=...&t=...). Treat them identically so agent buyers
+// see their order confirmation too.
+const checkoutPath = /^\/checkout\/(success|cancel)\/?$/.exec(window.location.pathname)?.[1];
+const checkoutParam =
+  new URLSearchParams(window.location.search).get("checkout") ??
+  (checkoutPath === "success" ? "success" : checkoutPath === "cancel" ? "canceled" : null);
 const orderParam = new URLSearchParams(window.location.search).get("order");
 
 export function App() {
