@@ -209,6 +209,108 @@ function bytesFromString(value: string): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToB64(bytes: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+// ── Gemini brand concepts (primary) ──────────────────────────────────────────
+// Real AI artwork from the extracted brand identity. Each concept takes a
+// distinct creative direction so the user gets a genuine choice, not three
+// shades of the same idea. The programmatic SVGs below remain as a keyless
+// fallback so analyze_brand never returns empty.
+type Concept = { label: string; prompt: string; useLogoRef?: boolean };
+
+function brandConcepts(brand: Brand): Concept[] {
+  const palette = brand.colors.slice(0, 4).join(", ");
+  const base =
+    `Original, standalone print-ready merch artwork — no t-shirt, no apparel, no product mockup, ` +
+    `no photo, no watermark. Single bold centered graphic suited to garment printing (DTG): ` +
+    `strong shapes, high contrast, limited palette drawn from the brand colors ${palette}. ` +
+    `Place the subject centered on a perfectly FLAT solid pure-white (#FFFFFF) background that fills ` +
+    `the ENTIRE canvas edge-to-edge — no card, frame, border, drop shadow, checkerboard, gradient, or texture. `;
+  return [
+    {
+      label: `${brand.name} emblem`,
+      useLogoRef: true,
+      prompt:
+        base +
+        `Subject: a modern circular emblem or badge for the brand "${brand.name}" — a geometric mark ` +
+        `built around the brand's identity, clean flat-vector style, suitable as a chest print.`,
+    },
+    {
+      label: `${brand.name} wordmark`,
+      prompt:
+        base +
+        `Subject: a bold typographic lockup of the brand name "${brand.name}" — confident display ` +
+        `typography with streetwear energy, tight kerning, optional thin rule or star accents.`,
+    },
+    {
+      label: `${brand.name} icon`,
+      useLogoRef: true,
+      prompt:
+        base +
+        `Subject: a playful flat-vector icon or mascot that captures the spirit of "${brand.name}" ` +
+        `(${brand.domain}) — friendly, memorable, two or three colors from the brand palette.`,
+    },
+  ];
+}
+
+async function generateConcept(
+  prompt: string,
+  logoRef: { bytes: Uint8Array; contentType: string } | null,
+): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const key = Deno.env.get("GOOGLE_AI_API_KEY");
+  if (!key) return null;
+  const model = Deno.env.get("GOOGLE_IMAGE_MODEL") ?? "gemini-3.1-flash-image-preview";
+  // Gemini takes raster references only — SVG favicons can't be attached.
+  const canRef = !!logoRef && /^image\/(png|jpe?g|webp)$/i.test(logoRef.contentType);
+  const parts: Array<Record<string, unknown>> = [{ text: prompt }];
+  if (canRef && logoRef) {
+    parts.push(
+      { text: "Reference: the brand's current logo. Reinterpret its character — do not copy it pixel-for-pixel." },
+      { inlineData: { mimeType: logoRef.contentType, data: bytesToB64(logoRef.bytes) } },
+    );
+  }
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseModalities: ["IMAGE"] },
+        }),
+      },
+    );
+    if (!res.ok) {
+      console.error("brand gemini error", res.status, (await res.text()).slice(0, 200));
+      return null;
+    }
+    const out = await res.json();
+    const outParts: Array<{ inlineData?: { data?: string; mimeType?: string } }> =
+      out?.candidates?.[0]?.content?.parts ?? [];
+    const img = outParts.find((p) => p.inlineData?.data)?.inlineData;
+    if (!img?.data) return null;
+    return { bytes: b64ToBytes(img.data), mime: img.mimeType ?? "image/png" };
+  } catch (e) {
+    console.error("brand gemini failed", e);
+    return null;
+  }
+}
+
 function extension(contentType: string): string {
   if (contentType.includes("svg")) return "svg";
   if (contentType.includes("webp")) return "webp";
@@ -296,18 +398,40 @@ export default async function (req: Request): Promise<Response> {
     if (d) designs.push(d);
   }
 
-  for (const variant of ["crest", "signal", "wordmark"] as const) {
-    const svg = conceptSvg(brand, variant);
-    const d = await persist(admin, bytesFromString(svg), "image/svg+xml", {
+  // Real Gemini concepts, generated in parallel; persisted in concept order.
+  const concepts = brandConcepts(brand);
+  const generated = await Promise.all(
+    concepts.map((c) => generateConcept(c.prompt, c.useLogoRef ? logo : null)),
+  );
+  for (let i = 0; i < concepts.length; i++) {
+    const art = generated[i];
+    if (!art) continue;
+    const d = await persist(admin, art.bytes, art.mime, {
       source: "ai",
-      label: `${brand.name} ${variant}`,
-      prompt: `Transparent ${variant} merch concept for ${brand.domain}`,
+      label: concepts[i].label,
+      prompt: concepts[i].prompt,
       sessionKey,
       agentSource,
     });
     if (d) designs.push(d);
   }
 
+  // Keyless fallback: programmatic SVG concepts so the tool never returns empty.
+  if (designs.length <= (logo ? 1 : 0)) {
+    for (const variant of ["crest", "signal", "wordmark"] as const) {
+      const svg = conceptSvg(brand, variant);
+      const d = await persist(admin, bytesFromString(svg), "image/svg+xml", {
+        source: "ai",
+        label: `${brand.name} ${variant}`,
+        prompt: `Transparent ${variant} merch concept for ${brand.domain}`,
+        sessionKey,
+        agentSource,
+      });
+      if (d) designs.push(d);
+    }
+  }
+
   if (!designs.length) return json(502, { error: "Couldn't save brand designs. Check storage/function logs." });
   return json(200, { brand, designs });
 }
+

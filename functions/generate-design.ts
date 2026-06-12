@@ -138,6 +138,21 @@ function buildPrompt(prompt: string, aspectRatio: string, transparent: boolean):
   );
 }
 
+// Quote/slogan merch: unlike general artwork (where stray text is a defect),
+// the text IS the design. Tuned so the lockup reads on both black and white
+// garments after white-key background removal.
+function buildQuotePrompt(prompt: string, aspectRatio: string): string {
+  return (
+    `Original, standalone print-ready TYPOGRAPHIC merch artwork — no t-shirt, no apparel, no product mockup, no photo, no watermark, no brand logos. ` +
+    `Design a beautiful quote lockup: expressive display typography with clear hierarchy, optional small flourishes (thin rules, stars, laurels), flat vector style. ` +
+    `Render the quote text EXACTLY as written, spelled correctly, as the hero of the composition. ` +
+    `Use one to three saturated ink colors with strong contrast. CRITICAL: the design must read perfectly printed on either a BLACK or a WHITE garment — avoid pure-white fills and large pure-black areas; prefer bold saturated or mid-tone colors, or letterforms with contrasting outlines. ` +
+    `Place the lockup centered on a perfectly FLAT solid pure-white (#FFFFFF) background that fills the entire canvas edge-to-edge — no card, frame, border, drop shadow, checkerboard, gradient, or texture. ` +
+    `Composition aspect ratio approximately ${aspectRatio}. ` +
+    `Quote and art direction: ${prompt}`
+  );
+}
+
 function openAiSize(aspectRatio: string): string {
   const [w, h] = aspectRatio.split(":").map(Number);
   if (!w || !h || w === h) return "1024x1024";
@@ -231,6 +246,8 @@ export default async function (req: Request): Promise<Response> {
     source?: "ai" | "upload" | "preset";
     aspectRatio?: string;
     transparent?: boolean;
+    /** "quote" → typographic lockup template (text is the design); "auto" detects quotation marks. */
+    style?: "auto" | "quote";
     label?: string;
     sessionKey?: string;
     agentSource?: string;
@@ -256,7 +273,11 @@ export default async function (req: Request): Promise<Response> {
     if (!verdict.ok)
       return json(422, { error: verdict.reason, message: verdict.reason, moderation: true });
 
-    const shaped = buildPrompt(prompt, aspectRatio, transparent);
+    const style = body.style ?? "auto";
+    const isQuote = style === "quote" || (style === "auto" && /["“”]/.test(prompt));
+    const shaped = isQuote
+      ? buildQuotePrompt(prompt, aspectRatio)
+      : buildPrompt(prompt, aspectRatio, transparent);
     // Primary (Gemini) → fallback (OpenAI). Track whether *either* provider
     // refused on safety grounds so we can report a content block distinctly.
     const primary = await generateWithGemini(shaped);
@@ -333,3 +354,4 @@ export default async function (req: Request): Promise<Response> {
     design: { id: row?.id, label, imageUrl: up.url, imageKey: up.key },
   });
 }
+
